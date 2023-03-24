@@ -1,2 +1,7 @@
 dev/
 dist/
+
+__pycache__
+.pytest_cache
+
+.vscode
