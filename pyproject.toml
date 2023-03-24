@@ -8,6 +8,7 @@ dynamic = ["version"]
 description = "Python module for pinpointing and handling nested failures"
 readme = "README.md"
 license = "MIT"
+requires-python = ">=3.6"
 authors = [
     {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
 ]
