@@ -1,10 +1,6 @@
 name: Tests
 
-on: 
-  - push
-  - pull_request:
-    branch:
-      - main
+on: [pull_request, push]
 
 jobs:
   test:
