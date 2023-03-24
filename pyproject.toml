@@ -7,13 +7,14 @@ name = "failures"
 dynamic = ["version"]
 description = "Python module for pinpointing and handling nested failures"
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT License"}
 requires-python = ">=3.6"
+
 authors = [
-    {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
+    {name = "MARSO Adnan"},
 ]
 maintainers = [
-  {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
+    {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
 ]
 keywords = [
     "failures",
@@ -40,7 +41,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/mediadnan/Failures"
+homepage = "https://github.com/mediadnan/Failures"
 
 [tool.hatch.version]
 path = "failures.py"
