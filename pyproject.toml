@@ -1,17 +1,16 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "failures"
 dynamic = ["version"]
-description = "Python module for pinpointing and handling nested failures"
+description = "Tool for handling nested calls errors and pipointing their source"
 readme = "README.md"
 license = {text = "MIT License"}
 requires-python = ">=3.6"
-
 authors = [
-    {name = "MARSO Adnan"},
+    {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
 ]
 maintainers = [
     {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
@@ -24,7 +23,7 @@ keywords = [
     "track",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 1 - Planning",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -35,16 +34,31 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Topic :: Software Development :: Bug Tracking",
     "Topic :: Utilities",
     "Typing :: Typed"
 ]
 
 [project.urls]
-homepage = "https://github.com/mediadnan/Failures"
+documentation = "https://failures.readthedocs.org"
+repository = "https://github.com/mediadnan/failures"
 
-[tool.hatch.version]
-path = "failures.py"
+[tool.setuptools.dynamic]
+version = {attr = "failures.__version__"}
 
-[tool.hatch.build]
-include = ["failures.py"]
+[project.optional-dependencies]
+colors = ["colorama==0.4.*"]
+
+[tool.setuptools]
+packages = ["failures"]
+package-data = { failures = ["py.typed"] }
+
+[tool.black]
+line-length = 120
+target-version = [
+    'py36',
+    'py37',
+    'py38',
+    'py39',
+    'py310',
+    'py311'
+]

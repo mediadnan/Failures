@@ -1,7 +1,8 @@
-dev/
-dist/
-
-__pycache__
+/dist/
+*/__pycache__/*
 .pytest_cache
-
-.vscode
+.vscode/
+.idea/
+/venv/
+/.vscode/
+/htmlcov/
