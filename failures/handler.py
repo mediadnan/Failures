@@ -1,7 +1,7 @@
 from typing import Callable
 from datetime import datetime
 
-try:                                # Optional for colored console logs
+try:  # Optional for colored console logs
     from colorama import Fore, Style, just_fix_windows_console  # noqa
 
     just_fix_windows_console()

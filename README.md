@@ -1,7 +1,7 @@
 # Failures
 
 _Handling failures was never easier_
-    
+
 ## What is failures
 
 Failures is a simple python3 module that provides tools to handle
@@ -11,7 +11,7 @@ This module has been part from another python library called fastchain, but then
 separated and independent of that library, and added as it dependecy.
 
 ## Installation
-``failures`` requires python 3.7 or higher.
+``failures`` requires python 3.6 or higher.
 
 You can install it from pypi using the pip command
 
