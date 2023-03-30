@@ -23,17 +23,5 @@ def print_failure(source: str, error: Exception) -> None:
     print(_error_format.format(src=source, type=err_type, error=error, time=time))
 
 
+# (Protocol) describing a substitute of the default handler
 FailureHandler = Callable[[str, Exception], None]
-
-
-class Failure(Exception):
-    source: str
-    error: Exception
-
-    def __init__(self, source: str, error: Exception):
-        self.source = source
-        self.error = error
-
-    def within(self, name: str) -> "Failure":
-        self.source = name + "." + self.source
-        return self

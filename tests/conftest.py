@@ -1,41 +1,21 @@
-import sys
-import importlib
-import unittest.mock
-from typing import Optional
+from typing import Tuple, List
 
 from pytest import fixture
 
-import failures
-
 
 class FailureHolder:
-    source: Optional[str]
-    error: Optional[Exception]
+    failures: List[Tuple[str, Exception]]
 
     def __init__(self):
-        self.source = None
-        self.error = None
+        self.failures = []
 
     def __call__(self, source: str, error: Exception) -> None:
-        self.source = source
-        self.error = error
+        self.failures.append((source, error))
 
 
 @fixture
 def handler():
     return FailureHolder()
-
-
-@fixture
-def no_colorama_dependency():
-    modules_copy = sys.modules.copy()
-    modules_copy.pop("colorama")
-    with unittest.mock.patch.object(sys, "modules", modules_copy):
-        try:
-            importlib.reload(failures)
-            yield
-        finally:
-            importlib.reload(failures)
 
 
 @fixture

@@ -1,17 +1,22 @@
-import importlib
 import re
 import sys
-from importlib import import_module
+import importlib
 
 import pytest
-from unittest import mock
 
-# noinspection PyProtectedMember
-from failures.handler import Failure, print_failure, _error_format  # noqa: W0212
+import failures
+
+
+@pytest.fixture
+def no_colorama_installed(monkeypatch):
+    modules_copy = sys.modules.copy()
+    modules_copy.pop("colorama")
+    monkeypatch.setattr(sys, "modules", modules_copy)
+    importlib.reload(failures.handler)
 
 
 def test_failure_exception(error):
-    failure = Failure("inner", error)
+    failure = failures.context.Failure("inner", error)
     assert failure.source == "inner"
     assert failure.error is error
     failure = failure.within("inside")
@@ -28,25 +33,21 @@ MESSAGE_PATTERN = re.compile(
 
 
 def test_print_failure_format_with_colorama_installed():
+    pattern = failures.handler._error_format
     assert MESSAGE_PATTERN.match(
-        _error_format.format(src="test_source", type="ValueError", error="test error", time="2023-06-21 05:25:30")
+        pattern.format(src="test_source", type="ValueError", error="test error", time="2023-06-21 05:25:30")
     )
 
 
 @pytest.mark.xfail()
-def test_print_failure_format_without_colorama_installed(no_colorama_dependency):
-    from importlib import reload
-    import failures
-    with mock.patch.dict(sys.modules, {'colorama': None}):
-        reload(failures.handler)
-        message = failures.handler._error_format.format(
-            src="test_source", type="ValueError", error="test error", time="2023-06-21 05:25:30"
-        )
-    reload(failures.handler)
+def test_print_failure_format_without_colorama_installed(no_colorama_installed):
+    message = failures.handler._error_format.format(
+        src="test_source", type="ValueError", error="test error", time="2023-06-21 05:25:30"
+    )
     assert message == "[FAILURE] test_source :: ValueError(test error) 2023-06-21 05:25:30"
 
 
 def test_print_failure(capsys):
-    print_failure("test_source", ValueError("test error"))
+    failures.handler.print_failure("test_source", ValueError("test error"))
     captured = capsys.readouterr()
     assert MESSAGE_PATTERN.match(captured.out)
