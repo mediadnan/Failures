@@ -1,5 +1,5 @@
 # Failures
-
+[![Tests](https://github.com/mediadnan/Failures/workflows/tests/badge.svg)](https://github.com/mediadnan/Failures/actions)
 _Handling failures was never easier_
 
 ## What is failures
