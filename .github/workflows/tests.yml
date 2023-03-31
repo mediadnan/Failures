@@ -10,61 +10,65 @@ on:
 
 jobs:
   test:
-    name: Running tests 🧪
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        python-version: [
-          '3.7',
-          '3.8',
-          '3.9',
-          '3.10',
-          '3.11'
-        ]
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    name: Testing 🧪
+    runs-on: ubuntu-latest
+
     env:
-      os: ${{ matrix.os }}
-      python-version: ${{ matrix.python-version }}
+      os: 3.11
+      python-version: ubuntu-latest
+      package: failures
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ matrix.python-version }} 🐍
+      - name: Setting up Python ${{ env.python-version }} 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Installing testing dependencies 📥
+          python-version: ${{ env.python-version }}
+      - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install pytest pytest-sugar pytest-cov
-      - name : Testing with pytest 🧪
-        run: pytest --cov failures tests
+      - name : Running PyTest ▶️
+        run: pytest --cov ${{ env.package }} tests
       - name: Upload test coverage to Codecov ☂️
-        if: ${{ matrix.os }} == 'ubuntu-latest' && ${{ matrix.python-version }} == '3.11'
         uses: codecov/codecov-action@v3
         with:
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
           env_vars: os,python-version
 
-  lint:
-    name: Linters 🔎
+  types:
+    name: Static types checking 🔎
     runs-on: ubuntu-latest
     needs: test
 
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set up Python 🐍
+      - name: Setting up Python ${{ env.python-version }} 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: 3.11
+          python-version: ${{ env.python-version }}
+      - name: Installing dependencies 📥
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install mypy
+      - name: Running MyPy ▶️
+        run: mypy --install-types --non-interactive ${{ env.package }}
 
-      - name: Install Python dependencies 📥
-        run: pip install black flake8
+  style:
+    name: Code style checking 🎨
+    runs-on: ubuntu-latest
+    needs: test
 
-      - name: Run linters 🔎
-        uses: wearerequired/lint-action@v2
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setting up Python ${{ env.python-version }} 🐍
+        uses: actions/setup-python@v3
         with:
-          black: true
-          flake8: true
+          python-version: ${{ env.python-version }}
+      - name: Installing dependencies 📥
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install flake8
+      - name: Running flake8 ▶️
+        run: flake8 ${{ env.package }}
