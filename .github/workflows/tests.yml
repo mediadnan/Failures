@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - .github/**
+      - failures/**
+      - tests/**
   pull_request:
     branches:
       - main
