@@ -9,6 +9,9 @@ _Label failures for humans_
 This python3 package implements tools to explicitly label nested calls errors
 for functions without coupling or passing extra context arguments.
 
+>   __note__
+> This package is still in early development phase
+
 ## Installation
 **failures** requires python 3.7 or higher.
 
