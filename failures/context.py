@@ -41,11 +41,11 @@ def _validate_name(name: str) -> str:
     return name
 
 
-Failure_or_failures = Union[Failure, Failures]
-Exception_type_or_types = Union[Tuple[Type[Exception]], Type[Exception], None]
+FailureOrFailures = Union[Failure, Failures]
+ExceptionTypeOrTypes = Union[Tuple[Type[Exception]], Type[Exception], None]
 
 
-def _recursive_handler(handler: FailureHandler, failures: Failure_or_failures, ignore: Tuple[Type[Exception]]) -> None:
+def _recursive_handler(handler: FailureHandler, failures: FailureOrFailures, ignore: Tuple[Type[Exception]]) -> None:
     if isinstance(failures, Failures):
         for failure in failures.failures:
             _recursive_handler(handler, failure, ignore)
@@ -106,10 +106,10 @@ class handle:
 
     __scope: scope
     __handler: FailureHandler
-    __ignore: Exception_type_or_types
+    __ignore: ExceptionTypeOrTypes
 
     def __init__(
-        self, name: str, handler: FailureHandler = print_failure, *, ignore: Exception_type_or_types = None
+        self, name: str, handler: FailureHandler = print_failure, *, ignore: ExceptionTypeOrTypes = None
     ) -> None:
         if not callable(handler):
             raise TypeError("Failure handler must be a callable")
