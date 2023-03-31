@@ -8,28 +8,23 @@ on:
     branches:
       - main
 
-env:
-  OS: ubuntu-latest
-  PYTHON: 3.11
-  PACKAGE: failures
-
 jobs:
   test:
     name: Testing 🧪
-    runs-on: ${{ env.OS }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ env.PYTHON }} 🐍
+      - name: Setting up Python 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ env.PYTHON }}
+          python-version: 3.11
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install pytest pytest-sugar pytest-cov
       - name : Running PyTest ▶️
-        run: pytest --cov ${{ env.PACKAGE }} tests
+        run: pytest --cov failures tests
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3
         with:
@@ -39,36 +34,36 @@ jobs:
 
   types:
     name: Static types checking 🔎
-    runs-on: ${{ env.OS }}
+    runs-on: ubuntu-latest
     needs: test
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ env.PYTHON }} 🐍
+      - name: Setting up Python 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ env.PYTHON }}
+          python-version: 3.11
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install mypy
       - name: Running MyPy ▶️
-        run: mypy --install-types --non-interactive ${{ env.PACKAGE }}
+        run: mypy --install-types --non-interactive failures
 
   style:
     name: Code style checking 🎨
-    runs-on: ${{ env.OS }}
+    runs-on: ubuntu-latest
     needs: test
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ env.PYTHON }} 🐍
+      - name: Setting up Python 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ env.PYTHON }}
+          python-version: 3.11
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install flake8
       - name: Running flake8 ▶️
-        run: flake8 ${{ env.PACKAGE }}
+        run: flake8 failures
