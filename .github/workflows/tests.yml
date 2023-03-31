@@ -8,67 +8,67 @@ on:
     branches:
       - main
 
+env:
+  OS: ubuntu-latest
+  PYTHON: 3.11
+  PACKAGE: failures
+
 jobs:
   test:
     name: Testing 🧪
-    runs-on: ubuntu-latest
-
-    env:
-      os: ubuntu-latest
-      python-version: 3.11
-      package: failures
+    runs-on: ${{ env.OS }}
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ env.python-version }} 🐍
+      - name: Setting up Python ${{ env.PYTHON }} 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ env.python-version }}
+          python-version: ${{ env.PYTHON }}
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install pytest pytest-sugar pytest-cov
       - name : Running PyTest ▶️
-        run: pytest --cov ${{ env.package }} tests
+        run: pytest --cov ${{ env.PACKAGE }} tests
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3
         with:
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
-          env_vars: os,python-version
+          env_vars: OS,PYTHON
 
   types:
     name: Static types checking 🔎
-    runs-on: ubuntu-latest
+    runs-on: ${{ env.OS }}
     needs: test
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ env.python-version }} 🐍
+      - name: Setting up Python ${{ env.PYTHON }} 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ env.python-version }}
+          python-version: ${{ env.PYTHON }}
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install mypy
       - name: Running MyPy ▶️
-        run: mypy --install-types --non-interactive ${{ env.package }}
+        run: mypy --install-types --non-interactive ${{ env.PACKAGE }}
 
   style:
     name: Code style checking 🎨
-    runs-on: ubuntu-latest
+    runs-on: ${{ env.OS }}
     needs: test
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ env.python-version }} 🐍
+      - name: Setting up Python ${{ env.PYTHON }} 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ env.python-version }}
+          python-version: ${{ env.PYTHON }}
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install flake8
       - name: Running flake8 ▶️
-        run: flake8 ${{ env.package }}
+        run: flake8 ${{ env.PACKAGE }}
