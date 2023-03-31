@@ -1,17 +1,16 @@
 # Failures
-[![Tests](https://github.com/mediadnan/Failures/workflows/tests/badge.svg)](https://github.com/mediadnan/Failures/actions)
-_Handling failures was never easier_
+_Label failures for humans_
+
+[![Tests](https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg)](https://github.com/mediadnan/Failures/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME)](https://codecov.io/gh/mediadnan/Failures)
+
 
 ## What is failures
-
-Failures is a simple python3 module that provides tools to handle
-nested calls errors and tracks where errors are being handled.
-
-This module has been part from another python library called fastchain, but then as it can be useful by it own, it has been
-separated and independent of that library, and added as it dependecy.
+This python3 package implements tools to explicitly label nested calls errors
+for functions without coupling or passing extra context arguments.
 
 ## Installation
-``failures`` requires python 3.6 or higher.
+**failures** requires python 3.7 or higher.
 
 You can install it from pypi using the pip command
 
@@ -20,5 +19,4 @@ pip install failures
 ```
 
 ## Usage
-
-.. TODO
+    TODO...
