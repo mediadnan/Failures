@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      os: 3.11
-      python-version: ubuntu-latest
+      os: ubuntu-latest
+      python-version: 3.11
       package: failures
 
     steps:
