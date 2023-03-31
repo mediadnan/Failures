@@ -1,0 +1,52 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  test:
+    name: Running tests 🧪
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        python-version: [ 3.7, 3.8, 3.9, 3.10, 3.11 ]
+    env:
+      os: ${{ matrix.os }}
+      python: ${{ matrix.python-version }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setting up Python ${{ matrix.python-version }} 🐍
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Installing dependencies 📥
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install pytest
+      - name: Testing with pytest 🧪
+        run: pytest tests
+
+  upload:
+    name: Publishing to PyPI ⬆️
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      python-version: 3.11
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setting up Python ${{ env.python-version }} 🐍
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.python-version }}
+      - name: Installing dependencies 📥⬇️
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install twine build setuptools
+      - name: Packaging with Build 📦🔨
+        run: python3 -m build -o dist/
+      - name: Pushing package to PyPI 📦⬆️
+        run: twine upload --non-interactive -u __token__ -p ${{ secrets.PYPI_TOKEN }} dist/*
