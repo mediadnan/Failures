@@ -1,8 +1,11 @@
 /dist/
 */__pycache__/*
 .pytest_cache
-.vscode/
-.idea/
-/venv/
 /.vscode/
+/.idea/
+/venv/
 /htmlcov/
+/failures.egg-info/
+/.tox/
+.coverage
+/.mypy_cache/

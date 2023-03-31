@@ -10,48 +10,47 @@ on:
 
 jobs:
   test:
-    name: Tests 🧪
-    runs-on: ubuntu-latest
+    name: Running tests 🧪
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         python-version: [
           '3.7',
-          '3.8', 
-          '3.9', 
-          '3.10', 
+          '3.8',
+          '3.9',
+          '3.10',
           '3.11'
         ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    env:
+      os: ${{ matrix.os }}
+      python-version: ${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }} 🐍
+      - name: Setting up Python ${{ matrix.python-version }} 🐍
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install Dev Dependencies 📥
+      - name: Installing testing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
           pip install pytest pytest-sugar pytest-cov
       - name : Testing with pytest 🧪
         run: pytest --cov failures tests
-
-  code-cov:
-    name: Code Coverage ☂
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Upload Coverage to Codecov ☂️
+      - name: Upload test coverage to Codecov ☂️
+        if: ${{ matrix.os }} == 'ubuntu-latest' && ${{ matrix.python-version }} == '3.11'
         uses: codecov/codecov-action@v3
         with:
           name: codecov-umbrella
-          env_vars: OS,PYTHON
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+          env_vars: os,python-version
 
   lint:
     name: Linters 🔎
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
       - uses: actions/checkout@v3
