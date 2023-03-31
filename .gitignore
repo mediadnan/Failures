@@ -1,11 +1,58 @@
-/dist/
-*/__pycache__/*
-.pytest_cache
-/.vscode/
-/.idea/
-/venv/
-/htmlcov/
-/failures.egg-info/
-/.tox/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+__pypackages__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
 .coverage
-/.mypy_cache/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Sphinx
+docs/_build/
+
+# Virtual Env
+env/
+venv/
+*-venv/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# PyCharm
+.idea/
