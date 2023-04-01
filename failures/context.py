@@ -1,30 +1,38 @@
-from typing import Optional, List, Set, Generator, Union, Type, Tuple, overload, TypeVar
+from typing import Optional, List, Set, Generator, Union, Type, Tuple, overload, TypeVar, cast
 
 from .handler import FailureHandler, print_failure
 
 
 class Failure(Exception):
+    """Wraps error to keep track of labeled sources"""
+
     def __init__(self, source: str, error: Exception):
         self.source: str = source
         self.error: Exception = error
 
     def within(self, name: str) -> "Failure":
+        """Adds outer label"""
         self.source = name + "." + self.source
         return self
 
 
 class Failures(Failure):
+    """Wraps multiple failures as a group"""
+
     def __init__(self, *failures: Failure) -> None:
         self.__failures: List[Failure] = list(failures)
 
     @property
     def failures(self) -> Generator[Failure, None, None]:
+        """Returns an iterator over registered failures"""
         yield from self.__failures
 
     def add(self, failure: Failure) -> None:
+        """Adds a new failure"""
         self.__failures.append(failure)
 
     def within(self, name: str) -> "Failures":
+        """Adds outer label for all registered failures"""
         self.__failures = [failure.within(name) for failure in self.__failures]
         return self
 
@@ -33,16 +41,19 @@ AnyException = TypeVar("AnyException", bound=BaseException)
 
 
 def _invalid(err_type: Type[AnyException], *args) -> AnyException:
+    """Marks an error as a package validation error and returns it"""
     error = err_type(*args)
     setattr(error, "__validation_error__", True)
     return error
 
 
 def _is_validation_error(error: Exception) -> bool:
+    """Checks if the error is a package validation error"""
     return getattr(error, "__validation_error__", False)
 
 
 def _validate_name(name: str) -> str:
+    """Validates the name and returns it"""
     if not isinstance(name, str):
         raise _invalid(TypeError, "name must be a string")
     elif not name.isidentifier():
@@ -54,7 +65,14 @@ FailureOrFailures = Union[Failure, Failures]
 ExceptionTypeOrTypes = Union[Tuple[Type[Exception]], Type[Exception], None]
 
 
-def _recursive_handler(handler: FailureHandler, failures: FailureOrFailures, ignore: Tuple[Type[Exception]]) -> None:
+def _recursive_handler(handler: FailureHandler, failures: FailureOrFailures, ignore: ExceptionTypeOrTypes) -> None:
+    """
+    Handles the failures recursively with the given handler
+
+    :param handler: A callable that takes two positional arguments (source: str, error: Exception)
+    :param failures: Failures objects that holds all the error with their source label
+    :param ignore: A tuple of exception types to ignore
+    """
     if isinstance(failures, Failures):
         for failure in failures.failures:
             _recursive_handler(handler, failure, ignore)
@@ -68,17 +86,21 @@ def _recursive_handler(handler: FailureHandler, failures: FailureOrFailures, ign
 
 
 class scope:
-    __slots__ = ("_name", "__subs", "_failures", "_root")
+    __slots__ = "_name", "__subs", "_failures"
 
     _name: str
     __subs: Set[str]
     _failures: Optional[Failures]
-    _root: Optional["scope"]
 
-    def __init__(self, name: str, *, root: Optional["scope"] = None) -> None:
+    def __init__(self, name: str) -> None:
+        """
+        scope is a context manager object that capture errors and labels them
+        then re-raises the wrapped failure to the higher context manager.
+
+        :param name: the scope label (mandatory)
+        """
         self._name = _validate_name(name)
         self.__subs = set()
-        self._root = root
         self._failures = None
 
     @property
@@ -90,11 +112,11 @@ class scope:
 
     @overload
     def add_failure(self, error: Exception, /, label: str) -> None:
-        ...
+        """Adds a labeled error to the failures scope"""
 
     @overload
     def add_failure(self, failure: Failure, /, label: Optional[str] = ...) -> None:
-        ...
+        """Adds a predefined failure to the failures scope with or without label"""
 
     def add_failure(self, error: Exception, /, label: Optional[str] = None) -> None:
         if isinstance(error, Failure):
@@ -121,17 +143,31 @@ class scope:
             self.add_failure(error, self._name)
         elif isinstance(error, BaseException):
             return False
-        if self._root is None:
-            raise self._failures from None
-        self._root.add_failure(self._failures)
-        return True
+        raise cast(Failures, self._failures) from None
 
     def __call__(self, name: str) -> "scope":
         if name in self.__subs:
             raise _invalid(ValueError, f"The name {name!r} is already used in this scope")
-        sub = scope(name, root=self)
+        sub = SubScope(name, self)
         self.__subs.add(sub.name)
         return sub
+
+
+class SubScope(scope):
+    __slots__ = "_root",
+
+    _root: scope
+
+    def __init__(self, name: str, root: scope):
+        super().__init__(name)
+        self._root = root
+
+    def __exit__(self, _err_type, error, _err_tb) -> bool:
+        try:
+            return super().__exit__(_err_type, error, _err_tb)
+        except Failure as failure:
+            self._root.add_failure(cast(Failures, failure))
+            return True
 
 
 class handle:

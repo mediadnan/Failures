@@ -1,7 +1,5 @@
-"""
-This small package provides context managers tools to handle nested errors and report them pinpointing their location.
-"""
-from contextlib import suppress  # noqa: F401
-from .context import scope, handle
+"""Providing tools to explicitly label errors"""
+from .handler import FailureHandler, print_failure
+from .context import scope, handle, Failure, Failures
 
-__version__ = "0.1.0-alpha.1"
+__version__ = "0.1.0"

@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "failures"
 dynamic = ["version"]
-description = "Tool for handling nested calls errors and pipointing their source"
+description = "Labeling failures for humans"
 readme = "README.md"
 license = {text = "MIT License"}
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 authors = [
     {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
 ]
@@ -24,12 +24,11 @@ keywords = [
     "track",
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
     "License :: OSI Approved :: MIT License",
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -55,8 +54,6 @@ package-data = { failures = ["py.typed"] }
 [tool.black]
 line-length = 120
 target-version = [
-    'py36',
-    'py37',
     'py38',
     'py39',
     'py310',
