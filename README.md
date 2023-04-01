@@ -1,5 +1,6 @@
-# Failures
-> Labeling failures for humans
+<div style="text-align: center">
+    <h1>Failures</h1>
+    <i>Labeling failures for humans</i>
 
 [![Tests](https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg)](https://github.com/mediadnan/Failures/actions/workflows/tests.yml)
 [![CodeCov](https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME)](https://codecov.io/gh/mediadnan/Failures)
@@ -7,6 +8,8 @@
 [![PyPI](https://img.shields.io/pypi/v/failures?label=PyPI%20version)](https://pypi.org/project/failures/)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/failures)](https://pypi.org/project/wheel/)
 [![License](https://img.shields.io/github/license/mediadnan/failures)](https://en.wikipedia.org/wiki/MIT_License)
+
+</div>
 
 ## What is failures
 Failures is a Python 3 package that contains utilities to explicitly label nested
