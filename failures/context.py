@@ -1,4 +1,4 @@
-from typing import Optional, List, Set, Generator, Union, Type, Tuple
+from typing import Optional, List, Set, Generator, Union, Type, Tuple, overload, TypeVar
 
 from .handler import FailureHandler, print_failure
 
@@ -29,15 +29,24 @@ class Failures(Failure):
         return self
 
 
-class DuplicateNameError(ValueError):
-    """signals that a name have been defined twice"""
+AnyException = TypeVar('AnyException', bound=Exception)
+
+
+def _invalid(err_type: Type[AnyException], *args) -> AnyException:
+    error = err_type(*args)
+    error.__validation_error__ = True
+    return error
+
+
+def _is_validation_error(error: Exception) -> bool:
+    return getattr(error, '__validation_error__', False)
 
 
 def _validate_name(name: str) -> str:
     if not isinstance(name, str):
-        raise TypeError(f"name must be a {str} instance")
+        raise _invalid(TypeError, "name must be a string")
     elif not name.isidentifier():
-        raise ValueError(f"invalid name: {name}")
+        raise _invalid(ValueError, f"invalid name: {name!r}")
     return name
 
 
@@ -49,54 +58,75 @@ def _recursive_handler(handler: FailureHandler, failures: FailureOrFailures, ign
     if isinstance(failures, Failures):
         for failure in failures.failures:
             _recursive_handler(handler, failure, ignore)
-    elif isinstance(failures, Failure) and not (ignore and isinstance(failures.error, ignore)):
-        handler(failures.source, failures.error)
+    elif isinstance(failures, Failure):
+        if ignore and isinstance(failures.error, ignore):
+            return
+        source, error = failures.source, failures.error
+        if _is_validation_error(error):
+            raise error
+        handler(source, error)
 
 
 class scope:
-    __slots__ = ("__name", "__subs", "__sup_failures", "__sub_failures")
+    __slots__ = ("_name", "__subs", "_failures", "_root")
 
-    __name: str
+    _name: str
     __subs: Set[str]
-    __sup_failures: Optional[List[Failure]]
-    __sub_failures: List[Failure]
+    _failures: Optional[Failures]
+    _root: Optional["scope"]
 
-    def __init__(self, name: str, *, _failures: Optional[List[Failure]] = None) -> None:
-        self.__name = _validate_name(name)
+    def __init__(self, name: str, *, root: Optional["scope"] = None) -> None:
+        self._name = _validate_name(name)
         self.__subs = set()
-        self.__sup_failures = _failures
-        self.__sub_failures = []
+        self._root = root
+        self._failures = None
 
     @property
     def name(self) -> str:
-        return self.__name
+        return self._name
 
     def __enter__(self) -> "scope":
         return self
 
-    def __exit__(self, failure_type, failure, traceback) -> bool:
-        sub_failures = self.__sub_failures
-        if not (failure or sub_failures):
+    @overload
+    def add_failure(self, error: Exception, label: str) -> None: ...
+    @overload
+    def add_failure(self, failure: Failure, label: Optional[str] = ...) -> None: ...
+
+    def add_failure(self, error: Exception, label: Optional[str] = None) -> None:
+        if isinstance(error, Failure):
+            failure = error
+            if label:
+                failure.within(label)
+        elif isinstance(error, Exception):
+            if not label:
+                raise _invalid(ValueError, "The error must be labeled")
+            failure = Failure(label, error)
+        else:
+            raise _invalid(TypeError, f"Invalid error type {{{type(error).__name__}}}")
+        if self._failures is None:
+            self._failures = Failures(failure)
+        else:
+            self._failures.add(failure)
+
+    def __exit__(self, _err_type, error, _err_tb) -> bool:
+        if not (error or self._failures):
             return True
-        elif isinstance(failure, Failure):
-            failure = failure.within(self.__name)
-        elif isinstance(failure, Exception):
-            failure = Failure(self.__name, failure)
-        elif isinstance(failure, BaseException):
+        if self._failures:
+            self._failures.within(self._name)
+        if isinstance(error, Exception):
+            self.add_failure(error, self._name)
+        elif isinstance(error, BaseException):
             return False
-        if sub_failures:
-            failures = Failures(*sub_failures).within(self.__name)
-            failures.add(failure)
-            failure = failures
-        if self.__sup_failures is None:
-            raise failure from None
-        self.__sup_failures.append(failure)
+        if self._root is None:
+            raise self._failures from None
+        self._root.add_failure(self._failures)
         return True
 
     def __call__(self, name: str) -> "scope":
         if name in self.__subs:
-            raise DuplicateNameError(f"The name {name!r} has already been given to a previous child of {self.__name!r}")
-        sub = scope(name, _failures=self.__sub_failures)
+            raise _invalid(ValueError, f"The name {name!r} is already used in this scope")
+        sub = scope(name, root=self)
         self.__subs.add(sub.name)
         return sub
 
