@@ -113,7 +113,7 @@ class scope:
             self._failures.add(failure)
 
     def __exit__(self, _err_type, error, _err_tb) -> bool:
-        if error is None or self._failures is None:
+        if error is None and self._failures is None:
             return True
         if self._failures:
             self._failures.within(self._name)
