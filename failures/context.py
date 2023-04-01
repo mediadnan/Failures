@@ -29,17 +29,17 @@ class Failures(Failure):
         return self
 
 
-AnyException = TypeVar('AnyException', bound=Exception)
+AnyException = TypeVar("AnyException", bound=BaseException)
 
 
 def _invalid(err_type: Type[AnyException], *args) -> AnyException:
     error = err_type(*args)
-    error.__validation_error__ = True
+    setattr(error, "__validation_error__", True)
     return error
 
 
 def _is_validation_error(error: Exception) -> bool:
-    return getattr(error, '__validation_error__', False)
+    return getattr(error, "__validation_error__", False)
 
 
 def _validate_name(name: str) -> str:
@@ -89,11 +89,14 @@ class scope:
         return self
 
     @overload
-    def add_failure(self, error: Exception, label: str) -> None: ...
-    @overload
-    def add_failure(self, failure: Failure, label: Optional[str] = ...) -> None: ...
+    def add_failure(self, error: Exception, /, label: str) -> None:
+        ...
 
-    def add_failure(self, error: Exception, label: Optional[str] = None) -> None:
+    @overload
+    def add_failure(self, failure: Failure, /, label: Optional[str] = ...) -> None:
+        ...
+
+    def add_failure(self, error: Exception, /, label: Optional[str] = None) -> None:
         if isinstance(error, Failure):
             failure = error
             if label:
@@ -110,7 +113,7 @@ class scope:
             self._failures.add(failure)
 
     def __exit__(self, _err_type, error, _err_tb) -> bool:
-        if not (error or self._failures):
+        if error is None or self._failures is None:
             return True
         if self._failures:
             self._failures.within(self._name)
@@ -139,7 +142,7 @@ class handle:
     __ignore: ExceptionTypeOrTypes
 
     def __init__(
-        self, name: str, handler: FailureHandler = print_failure, *, ignore: ExceptionTypeOrTypes = None
+            self, name: str, handler: FailureHandler = print_failure, *, ignore: ExceptionTypeOrTypes = None
     ) -> None:
         if not callable(handler):
             raise TypeError("Failure handler must be a callable")
