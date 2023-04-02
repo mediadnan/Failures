@@ -1,14 +1,11 @@
-<div style="text-align: center">
-    <h1>Failures</h1>
-    <i>Labeling failures for humans</i>
-
-[![Tests](https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg)](https://github.com/mediadnan/Failures/actions/workflows/tests.yml)
-[![CodeCov](https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME)](https://codecov.io/gh/mediadnan/Failures)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/failures)](https://www.python.org/downloads/)
-[![PyPI](https://img.shields.io/pypi/v/failures?label=PyPI%20version)](https://pypi.org/project/failures/)
-[![PyPI - Wheel](https://img.shields.io/pypi/wheel/failures)](https://pypi.org/project/wheel/)
-[![License](https://img.shields.io/github/license/mediadnan/failures)](https://en.wikipedia.org/wiki/MIT_License)
-
+<div id="readme_header" style="text-align: center">
+<h1>Failures</h1>
+<i>Labeling failures for humans</i>
+<br/><br/>
+<a href="https://github.com/mediadnan/Failures/actions/workflows/tests.yml"><img src="https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg" alt="Tests"/></a>
+<a href="https://codecov.io/gh/mediadnan/Failures"><img src="https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME" alt="CodeCov"/></a>
+<a href="https://www.python.org/downloads/"><img src="https://img.shields.io/pypi/pyversions/failures" alt="PyPI - Python Version"/></a>
+<a href="https://en.wikipedia.org/wiki/MIT_License"><img src="https://img.shields.io/github/license/mediadnan/failures" alt="License"/></a>
 </div>
 
 ## What is failures
@@ -23,6 +20,9 @@ you install it using the pip command:
 ```shell
 pip install failures
 ```
+
+> **Note**
+> If you install ``pip install "failures[colors]"``, the default handler will print errors with colors.
 
 ## Usage
     TODO...

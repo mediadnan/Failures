@@ -7,5 +7,5 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html" target
 
 ## [unreleased]
 
-## [0.1.0] 2023-04-01
+## [0.1.0] 2023-04-04
 First stable release.
