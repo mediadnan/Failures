@@ -15,20 +15,24 @@ on:
 jobs:
   test:
     name: Testing 🧪
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        python-version: [ '3.8', '3.11' ]
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python 🐍
+      - name: Setting up Python ${{ matrix.python-version }} 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: 3.11
+          python-version: ${{ matrix.python-version }}
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
-          pip install pytest pytest-sugar pytest-cov
+          pip install pytest pytest-cov
       - name : Running PyTest ▶️
-        run: pytest --cov failures tests
+        run: pytest --cov=src/ --cov-branch tests/
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3
         with:
@@ -52,7 +56,7 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install mypy
       - name: Running MyPy ▶️
-        run: mypy --install-types --non-interactive failures
+        run: mypy src/
 
   style:
     name: Code style checking 🎨
@@ -70,4 +74,4 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install flake8
       - name: Running flake8 ▶️
-        run: flake8 failures
+        run: flake8 src/
