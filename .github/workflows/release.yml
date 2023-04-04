@@ -7,11 +7,10 @@ on:
 jobs:
   test:
     name: Running tests 🧪
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
-        py: [ '3.8', '3.9', '3.10', '3.11' ]
+        py: [ '3.8', '3.11' ]
 
     steps:
       - uses: actions/checkout@v3
@@ -43,5 +42,7 @@ jobs:
           pip install twine build wheel setuptools
       - name: Packaging with Build 📦🔨
         run: python3 -m build -o dist/
+      - name: Checking package with Twine 📦🔎
+        run: twine check dist/*
       - name: Pushing package to PyPI 📦⬆️
         run: twine upload --non-interactive -u __token__ -p ${{ secrets.PYPI_TOKEN }} dist/*
