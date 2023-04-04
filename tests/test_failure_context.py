@@ -111,6 +111,22 @@ def test_higher_exception_propagation_bound_scope(handler):
 
 
 # validation
+@pytest.mark.parametrize(
+    "name", [
+        "root",
+        "root.sub",
+        "root.sub_scope",
+        "root.sub.sub.sub",
+        "root.scope1",
+        "scope2",
+        "scope.iteration[5].func",
+        "scope.func(1)",
+    ]
+    )
+def test_allowed_names(name):
+    failures._validate_name(name), "assert doesn't raise error"
+
+
 @pytest.mark.parametrize("handled", [True, False], ids=["with_handler", "without_handler"])
 @pytest.mark.parametrize(
     "func", [
@@ -118,14 +134,14 @@ def test_higher_exception_propagation_bound_scope(handler):
         pytest.param(failures.handle, id="handle"),
         pytest.param(failures.scope('root'), id="sub_scope"),
     ]
-    )
+)
 @pytest.mark.parametrize(
     "name,err_type,err_msg", [
         pytest.param(object(), TypeError, "name must be a string", id="wrong_type_name"),
         pytest.param('', ValueError, "invalid name: ''", id="empty_name"),
-        pytest.param('root-handler', ValueError, "invalid name: 'root-handler'", id="hyphen_name"),
+        pytest.param('name..sub', ValueError, "invalid name: 'name..sub'", id="double_dot"),
     ]
-    )
+)
 def test_unhandled_name_validation_error(
         handler,
         name: str,
@@ -149,7 +165,7 @@ def test_scope_add_error_without_label(error):
     scope.add_failure(failures.Failure("test_src", error))
     assert scope._failures
     with pytest.raises(TypeError, match="Invalid error type {object}"):
-        failures.scope('testing').add_failure(object()) # noqa
+        failures.scope('testing').add_failure(object())  # noqa
 
 
 def test_duplicate_name_sub_scope():
@@ -161,4 +177,4 @@ def test_duplicate_name_sub_scope():
 
 def test_invalid_handler_type():
     with pytest.raises(TypeError, match="Failure handler must be a callable"):
-        failures.handle("root_handler", object())   # noqa
+        failures.handle("root_handler", object())  # noqa

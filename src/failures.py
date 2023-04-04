@@ -1,6 +1,33 @@
-from typing import Optional, List, Set, Generator, Union, Type, Tuple, overload, TypeVar, cast
+"""
+Failures is a python module that contains tools for
+labeling nested errors and pinpoint their source.
+"""
+import importlib
+import pkgutil
+import re
+from typing import Optional, List, Set, Generator, Union, Type, Tuple, overload, TypeVar, cast, Callable
 
-from .handler import FailureHandler, print_failure
+__version__ = "0.1.0"
+__all__ = ("FailureHandler", "Failure", "Failures", "scope", "handle")
+
+# signature of a failure handler function
+FailureHandler = Callable[[str, Exception], None]
+
+default_handler: Optional[FailureHandler] = None
+
+
+def _load_plugins_default_handler() -> None:
+    for finder, name, is_pkg in pkgutil.iter_modules():
+        if not name.startswith('failures_handler_'):
+            continue
+        module = importlib.import_module(name)
+        if 'handler' in vars(module):
+            global default_handler
+            default_handler = getattr(module, 'handler')
+            break
+
+
+_load_plugins_default_handler()
 
 
 class Failure(Exception):
@@ -52,11 +79,14 @@ def _is_validation_error(error: Exception) -> bool:
     return getattr(error, "__validation_error__", False)
 
 
+NamePattern = re.compile(r'^(\w+(\[\w+]|\(\w+\))?)+([-.](\w+(\[\w+]|\(\w+\))?))*$')
+
+
 def _validate_name(name: str) -> str:
     """Validates the name and returns it"""
     if not isinstance(name, str):
         raise _invalid(TypeError, "name must be a string")
-    elif not name.isidentifier():
+    elif not NamePattern.match(name):
         raise _invalid(ValueError, f"invalid name: {name!r}")
     return name
 
@@ -178,9 +208,9 @@ class handle:
     __ignore: ExceptionTypeOrTypes
 
     def __init__(
-            self, name: str, handler: FailureHandler = print_failure, *, ignore: ExceptionTypeOrTypes = None
+            self, name: str, handler: FailureHandler = default_handler, *, ignore: ExceptionTypeOrTypes = None
     ) -> None:
-        if not callable(handler):
+        if not (handler is None or callable(handler)):
             raise TypeError("Failure handler must be a callable")
         self.__scope = scope(name)
         self.__handler = handler
@@ -193,5 +223,7 @@ class handle:
         try:
             self.__scope.__exit__(exc_type, exc_val, exc_tb)
         except Failure as failure:
+            if self.__handler is None:
+                return False
             _recursive_handler(self.__handler, failure, self.__ignore)
             return True

@@ -9,24 +9,12 @@ description = "Labeling failures for humans"
 readme = "README.md"
 license = {text = "MIT License"}
 requires-python = ">=3.8"
-authors = [
-    {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
-]
-maintainers = [
-    {name = "MARSO Adnan", email = "mediadnan@gmail.com"},
-]
-keywords = [
-    "label",
-    "failures",
-    "handle",
-    "handling",
-    "report",
-    "track",
-]
+authors = [ {name = "MARSO Adnan", email = "mediadnan@gmail.com"} ]
+maintainers = [ {name = "MARSO Adnan", email = "mediadnan@gmail.com"} ]
+keywords = [ "label", "failures", "handle", "handling", "report", "track" ]
 classifiers = [
     "License :: OSI Approved :: MIT License",
-    "Development Status :: 4 - Beta",
-#    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -42,21 +30,14 @@ classifiers = [
 documentation = "https://failures.readthedocs.org"
 repository = "https://github.com/mediadnan/failures"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.dynamic]
 version = {attr = "failures.__version__"}
 
 [project.optional-dependencies]
-colors = ["colorama==0.4.*"]
+print = ["failures_handler_print~=0.1"]
 
-[tool.setuptools]
-packages = ["failures"]
-package-data = { failures = ["py.typed"] }
-
-[tool.black]
-line-length = 120
-target-version = [
-    'py38',
-    'py39',
-    'py310',
-    'py311'
-]
+[tool.pytest.ini_options]
+pythonpath = ["src"]
