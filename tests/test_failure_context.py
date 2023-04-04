@@ -110,6 +110,13 @@ def test_higher_exception_propagation_bound_scope(handler):
                 raise BaseException("test_exception")  # noqa
 
 
+def test_handle_without_handler():
+    with pytest.raises(failures.Failure):
+        with failures.handle("testing"):
+            with failures.scope("scope"):
+                raise Exception("test_exception")
+
+
 # validation
 @pytest.mark.parametrize(
     "name", [

@@ -204,11 +204,11 @@ class handle:
     __slots__ = ("__scope", "__handler", "__ignore")
 
     __scope: scope
-    __handler: FailureHandler
+    __handler: Optional[FailureHandler]
     __ignore: ExceptionTypeOrTypes
 
     def __init__(
-            self, name: str, handler: FailureHandler = default_handler, *, ignore: ExceptionTypeOrTypes = None
+            self, name: str, handler: Optional[FailureHandler] = default_handler, *, ignore: ExceptionTypeOrTypes = None
     ) -> None:
         if not (handler is None or callable(handler)):
             raise TypeError("Failure handler must be a callable")
