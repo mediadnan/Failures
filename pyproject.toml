@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "failures"
-dynamic = ["version"]
+dynamic = ["version", "dependencies"]
 description = "Labeling failures for humans"
 readme = "README.md"
 license = {text = "MIT License"}
@@ -32,12 +32,18 @@ repository = "https://github.com/mediadnan/failures"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+packages = ["failures"]
 
 [tool.setuptools.dynamic]
 version = {attr = "failures.__version__"}
+dependencies = {file = "dependencies.txt"}
 
 [project.optional-dependencies]
-print = ["failures_handler_print~=0.1"]
+print = ["failures_handler_print>=0.1,<0.2"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+filterwarnings = ['ignore:.*will be removed in failures \d.0.*:DeprecationWarning',]
+
+[tool.mypy]
+implicit_optional = true
