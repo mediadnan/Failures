@@ -1,9 +1,10 @@
 vermin==1.5.*
 black==23.3.*
-pytest==7.2.*
+pytest==7.3.0
 pytest-cov==4.0.*
-mypy==1.1.*
-tox==4.4.*
+mypy==1.2.0
+tox==4.4.11
 flake8==6.0.*
 colorama>=0.4,<1.0
 failures_handler_print~=0.1
+typing_extensions>=4.5.0,<4.6.0
