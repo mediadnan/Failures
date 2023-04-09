@@ -8,6 +8,7 @@ on:
       - .github/**
       - src/**
       - tests/**
+      - requirements.txt
   pull_request:
     branches:
       - main
@@ -31,6 +32,7 @@ jobs:
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
+          pip install .
           pip install pytest pytest-cov
       - name : Running PyTest ▶️
         run: pytest --cov=src/ --cov-branch tests/
