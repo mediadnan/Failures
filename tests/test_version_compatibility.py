@@ -1,24 +1,23 @@
-from typing import Tuple, Type, Callable, Any
-
 import pytest
-
 import failures
 
 
-# use cases
 def test_flat_error_handling(handler, error):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler):
         raise error
     assert handler.failures == [("testing", error)]
 
 
 def test_suppress_failures(handler, error):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler, ignore=Exception):
         raise error
     assert handler.failures == []
 
 
 def test_suppress_specific_failures(handler):
+    # ensures compatibility with v0.1
     type_error = TypeError("type error")
     value_error = ValueError("value error")
     with failures.handle("root", handler, ignore=ValueError) as inner_scope:
@@ -30,20 +29,15 @@ def test_suppress_specific_failures(handler):
 
 
 def test_wrapped_error_handling(handler, error):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler):
         with failures.scope("function"):
             raise error
     assert handler.failures == [("testing.function", error)]
 
 
-def test_supress_error_handling(handler, error):
-    with failures.handle("testing", handler, ignore=Exception):
-        with failures.scope("function"):
-            raise error
-    assert handler.failures == []
-
-
 def test_nested_scopes_handling(handler, error):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler) as scope:
         with scope("first") as first_scope:
             with first_scope("inner"):
@@ -56,6 +50,7 @@ def test_nested_scopes_handling(handler, error):
 
 
 def test_nested_in_scope_error_handling(handler, error):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler) as scope:
         try:
             raise error  # some error occurs
@@ -68,6 +63,7 @@ def test_nested_in_scope_error_handling(handler, error):
 
 
 def test_successful_unbound_scope_execution(handler):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler):
         with failures.scope("inner_scope"):
             pass
@@ -75,6 +71,7 @@ def test_successful_unbound_scope_execution(handler):
 
 
 def test_successful_bound_scope_execution(handler):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler) as scope:
         with scope:
             pass
@@ -82,6 +79,7 @@ def test_successful_bound_scope_execution(handler):
 
 
 def test_successful_multiple_bound_scope_execution(handler):
+    # ensures compatibility with v0.1
     with failures.handle("testing", handler) as scope:
         try:
             pass
@@ -97,6 +95,7 @@ def test_successful_multiple_bound_scope_execution(handler):
 
 
 def test_higher_exception_propagation_unbound_scope(handler):
+    # ensures compatibility with v0.1
     with pytest.raises(BaseException):
         with failures.handle("testing", handler):
             with failures.scope("inner_scope"):
@@ -104,6 +103,7 @@ def test_higher_exception_propagation_unbound_scope(handler):
 
 
 def test_higher_exception_propagation_bound_scope(handler):
+    # ensures compatibility with v0.1
     with pytest.raises(BaseException):
         with failures.handle("testing", handler) as scope:
             with scope("inner_scope"):
@@ -111,77 +111,40 @@ def test_higher_exception_propagation_bound_scope(handler):
 
 
 def test_handle_without_handler():
+    # ensures compatibility with v0.1
     with pytest.raises(failures.Failure):
         with failures.handle("testing"):
             with failures.scope("scope"):
                 raise Exception("test_exception")
 
 
-# validation
-@pytest.mark.parametrize(
-    "name", [
-        "root",
-        "root.sub",
-        "root.sub_scope",
-        "root.sub.sub.sub",
-        "root.scope1",
-        "scope2",
-        "scope.iteration[5].func",
-        "scope.func(1)",
-    ]
-    )
-def test_allowed_names(name):
-    failures._validate_name(name), "assert doesn't raise error"
-
-
-@pytest.mark.parametrize("handled", [True, False], ids=["with_handler", "without_handler"])
-@pytest.mark.parametrize(
-    "func", [
-        pytest.param(failures.scope, id="scope"),
-        pytest.param(failures.handle, id="handle"),
-        pytest.param(failures.scope('root'), id="sub_scope"),
-    ]
-)
-@pytest.mark.parametrize(
-    "name,err_type,err_msg", [
-        pytest.param(object(), TypeError, "name must be a string", id="wrong_type_name"),
-        pytest.param('', ValueError, "invalid name: ''", id="empty_name"),
-        pytest.param('name..sub', ValueError, "invalid name: 'name..sub'", id="double_dot"),
-    ]
-)
-def test_unhandled_name_validation_error(
-        handler,
-        name: str,
-        err_type: [Type[BaseException], Tuple[Type[BaseException], ...]],
-        err_msg: str,
-        func: Callable[[str], Any],
-        handled: bool
-):
-    with pytest.raises(err_type, match=err_msg):
-        if handled:
-            with failures.handle('testing', handler):
-                func(name)
-        else:
-            func(name)
-
-
-def test_scope_add_error_without_label(error):
-    with pytest.raises(ValueError, match="The error must be labeled"):
-        failures.scope('testing').add_failure(error)  # noqa
-    scope = failures.scope('testing')
-    scope.add_failure(failures.Failure("test_src", error))
-    assert scope._failures
-    with pytest.raises(TypeError, match="Invalid error type {object}"):
-        failures.scope('testing').add_failure(object())  # noqa
-
-
-def test_duplicate_name_sub_scope():
-    scope = failures.scope("root_scope")
-    scope("sub_sub")
-    with pytest.raises(ValueError, match="The name 'sub_sub' is already used in this scope"):
-        scope("sub_sub")
-
-
 def test_invalid_handler_type():
     with pytest.raises(TypeError, match="Failure handler must be a callable"):
         failures.handle("root_handler", object())  # noqa
+
+
+def test_valid_names_handle(valid_label: str, handler):
+    # ensures compatibility with v0.1
+    failures.handle(valid_label, handler)
+
+
+def test_invalid_names_handle(invalid_label, err_type, err_msg, handler):
+    # ensures compatibility with v0.1
+    with pytest.raises(err_type, match=err_msg):
+        failures.handle(invalid_label, handler)
+
+
+def test_supress_error_handling(handler, error):
+    # ensures compatibility with v0.1
+    with failures.handle("testing", handler, ignore=Exception):
+        with failures.scope("function"):
+            raise error
+    assert handler.failures == []
+
+
+def test_failures_deprecated_add(error):
+    # ensures compatibility with v0.1
+    from failures.core import Failures, Failure
+    fls = Failures(Failure('failure1', error), Failure('failure2', error))
+    with pytest.warns(DeprecationWarning):
+        fls.add(Failure('failure3', error))
