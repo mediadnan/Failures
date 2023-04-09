@@ -36,7 +36,7 @@ packages = ["failures"]
 
 [tool.setuptools.dynamic]
 version = {attr = "failures.__version__"}
-dependencies = {file = "dependencies.txt"}
+dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
 print = ["failures_handler_print>=0.1,<0.2"]
