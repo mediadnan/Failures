@@ -1,6 +1,6 @@
 from typing import Union, Optional, Type
 
-from .plugins import default_handler
+from ._print import print_failure
 from .core import Scope, FailureHandler, FailureFilters, _invalid, scope, handler_, deprecated
 
 
@@ -15,7 +15,7 @@ class handle:
     def __init__(
             self,
             name: str,
-            handler: Optional[FailureHandler] = default_handler, *,
+            handler: Optional[FailureHandler] = print_failure, *,
             ignore: Union[FailureFilters, Type[Exception]] = None,
     ) -> None:
         if callable(handler):

@@ -14,6 +14,8 @@ from typing_extensions import (  # type: ignore[attr-defined]
     deprecated
 )
 
+from ._print import print_failure
+
 
 # Type Aliases
 FailureOrFailures: TypeAlias = Union['Failure', 'Failures']
@@ -77,9 +79,7 @@ def _validate_handler(handler: Union[FailureHandler, 'Handler', None]) -> Option
         return None
     elif isinstance(handler, Handler):
         return handler
-    elif callable(handler):
-        return Handler(handler)
-    raise _invalid(TypeError, "handler can either be None, a Handler instance or a function(str, Exception)")
+    return handler_(handler)
 
 
 def _label_failure(error: Union[Exception, 'Failure'], /, label: str) -> 'Failure':
@@ -138,7 +138,7 @@ class Handler:
     ignore: FailureFilters
     propagate: FailureFilters
 
-    def __init__(self, handler: FailureHandler, /, ignore: FailureFilters = (), propagate: FailureFilters = ()) -> None:
+    def __init__(self, handler: FailureHandler, /, ignore: FailureFilters, propagate: FailureFilters) -> None:
         """
         Custom failure handler that takes additional filtering information,
         the handler takes care of recursively fetching failures within
@@ -157,9 +157,7 @@ class Handler:
     @staticmethod
     def _match(specification: FailureFilters, failure: FailureOrFailures) -> bool:
         """Detects if the failure matches the specification"""
-        if specification is None:
-            return False
-        return isinstance(failure.error, specification)
+        return bool(specification) and isinstance(failure.error, specification)
 
     def __call__(self, failure: FailureOrFailures) -> None:
         if isinstance(failure, Failures):
@@ -171,8 +169,6 @@ class Handler:
                 return
             elif self._match(self.propagate, failure):
                 raise failure from None
-            elif _is_validation_error(error):
-                raise error
             self.handler_function(source, error)
 
 
@@ -184,10 +180,10 @@ def _prepare_filter_(flt: Union[FailureFilters, FailureFilter, None]) -> Failure
     return flt
 
 
-def handler_(   # underscored in module scope to allow un-shadowed used of the name
-        handler: SupportedFailureHandler, /, *,
-        ignore: Union[FailureFilters, FailureFilter, None] = (),
-        propagate: Union[FailureFilters, FailureFilter, None] = ()
+def handler_(   # underscored in module scope to allow un-shadowed used of the name 'handler'
+        handler: SupportedFailureHandler = print_failure, /, *,
+        ignore: Union[FailureFilters, FailureFilter, None] = None,
+        propagate: Union[FailureFilters, FailureFilter, None] = None
 ) -> Handler:
     """
     Creates a custom failure handler that takes additional filtering information.

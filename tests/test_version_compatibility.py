@@ -113,7 +113,7 @@ def test_higher_exception_propagation_bound_scope(handler):
 def test_handle_without_handler():
     # ensures compatibility with v0.1
     with pytest.raises(failures.Failure):
-        with failures.handle("testing"):
+        with failures.handle("testing", None):
             with failures.scope("scope"):
                 raise Exception("test_exception")
 

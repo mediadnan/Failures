@@ -35,7 +35,7 @@ jobs:
           pip install .
           pip install pytest pytest-cov
       - name : Running PyTest ▶️
-        run: pytest --cov=src/ --cov-branch tests/
+        run: pytest --cov=src/failures/ --cov-branch tests/
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3
         with:
@@ -57,9 +57,9 @@ jobs:
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
-          pip install mypy
+          pip install mypy types-colorama
       - name: Running MyPy ▶️
-        run: mypy src/
+        run: mypy src/failures/
 
   style:
     name: Code style checking 🎨
@@ -77,4 +77,4 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install flake8
       - name: Running flake8 ▶️
-        run: flake8 src/
+        run: flake8 src/failures/

@@ -6,3 +6,4 @@ mypy==1.2.0
 tox==4.4.11
 flake8==6.0.*
 colorama>=0.4,<1.0
+types-colorama>=0.4,<1.0

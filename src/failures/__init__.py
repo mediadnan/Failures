@@ -1,7 +1,7 @@
 """Failures package provides tools to label and track errors anywhere in your code easily"""
-from .plugins import handlers, default_handler
+from ._print import print_failure
 from .core import handler_ as handler, scope, scoped, FailureHandler, Failure
-from ._legacy import handle, SubScope   # deprecated
+from ._legacy import handle, SubScope   # deprecated API
 
 
 # -------------------------------- WARNING --------------------------------- #

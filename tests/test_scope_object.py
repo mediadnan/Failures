@@ -1,10 +1,3 @@
-import pytest
-import typing
-
-import failures
-from failures.core import Scope
-
-
 # ---------   Scope features test specifications    -------------------------------------#
 
 #   Scope as context manager
@@ -36,6 +29,12 @@ from failures.core import Scope
 #           + both error and registered failures handling [IMPLEMENTED]
 
 # ---------------------------------------------------------------------------------------#
+
+import typing
+import pytest
+
+import failures
+from failures.core import Scope
 
 
 # Scope as context manager
