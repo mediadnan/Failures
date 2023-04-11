@@ -173,6 +173,7 @@ class Handler:
 
 
 def _prepare_filter_(flt: Union[FailureFilters, FailureFilter, None]) -> FailureFilters:
+    """Ensures that filters are a tuple"""
     if flt is None:
         return ()
     elif not isinstance(flt, tuple):
@@ -189,8 +190,8 @@ def handler_(   # underscored in module scope to allow un-shadowed used of the n
     Creates a custom failure handler that takes additional filtering information.
 
     :param handler: function to be called with the failure details (or handler object)
-    :param ignore: a tuple of exception types to be ignored
-    :param propagate:  a tuple of exception types to be reraised
+    :param ignore: an exception type or a tuple of exception types to be ignored
+    :param propagate:  an exception type or a tuple of exception types to be reraised
     """
     ignore_ = _prepare_filter_(ignore)
     propagate_ = _prepare_filter_(propagate)
@@ -206,7 +207,7 @@ def handler_(   # underscored in module scope to allow un-shadowed used of the n
 
 
 class Scope:
-    __slots__ = ('__name', '__qualname', '__subs', '__failures', '__handler', '__root', '__origin')
+    __slots__ = ('__name', '__qualname', '__subs', '__failures', '__handler', '__origin')
 
     def __init__(self, name: str, handler: Handler = None, /, root: 'Scope' = None, origin: 'Scope' = None) -> None:
         """
@@ -215,17 +216,18 @@ class Scope:
         using the handler object if present, or re-raises the labeled
         failure to be captured by an outer layer scope.
 
-        :param name:
-        :param handler:
-        :param root:
-        :param origin:
+        (Note: The scope object is not directly created by the used, but through the 'scope' function)
+
+        :param name: the label of the context (Mandatory)
+        :param handler: the handler object (Optional, default = None)
+        :param root: The scope object that created this one (Optional)
+        :param origin: The scope object that created this one and all it's parents (Optional)
         """
         self.__name: str = name
         self.__qualname: str = _join(root.qualname, name) if isinstance(root, Scope) else name
         self.__subs: Set[str] = set()
         self.__failures: List[Failure] = []
         self.__handler: Optional[Handler] = handler
-        self.__root: Optional[Scope] = root
         self.__origin: Optional[Scope] = origin
 
     @overload
@@ -234,6 +236,12 @@ class Scope:
     def __call__(self, name: str, handler: SupportedFailureHandler, /) -> 'Scope': ...
 
     def __call__(self, name: str, handler: SupportedFailureHandler = None, /) -> 'Scope':
+        """
+        Creates a sub scope object that keep reference to this one as parent.
+
+        :param name: The label of the new sub scope (Mandatory)
+        :param handler: The handler function or Handler object (Optional, default = self.handler)
+        """
         _name = _validate_label(name)
         _handler = self.__handler if (handler is None) else _validate_handler(handler)
         if _name in self.__subs:
@@ -272,8 +280,8 @@ class Scope:
         """
         Registers the error with an optional label to be handled later.
 
-        :param error: exception or a pre-wrapped failure (mandatory)
-        :param label: if a label is passed, it will be prepended to the failure's source
+        :param error: exception or a pre-wrapped failure (Mandatory)
+        :param label: if a label is passed, it will be prepended to the failure's source (Optional)
         """
         if not isinstance(error, Exception):
             raise _invalid(TypeError, f"invalid error type {type(error).__name__!r}")
@@ -293,7 +301,7 @@ class Scope:
         is passed to the scope, otherwise, gathers all the failures and raises
         them to the higher scope to be captured.
 
-        :param error: either a failure, a failures or a normal exception object
+        :param error: either a failure, a failures or a normal exception object (Optional)
         """
         if isinstance(error, Exception):
             self.add_failure(error)
@@ -308,14 +316,14 @@ class Scope:
 
 def scope(name: str, handler: SupportedFailureHandler = None) -> Scope:
     """
-    Creates a labeled failure_scope object with and optional handler,
-    it a handler is provided, internal failures will be handled locally,
-    otherwise the error will be propagated.
+    Creates a labeled failure's scope object with and optional handler,
+    if the handler is provided, failures within scope will be handled locally,
+    otherwise the error will be raised with a label.
 
-    :param name: the context label to park inner failures (mandatory)
-    :param handler: the function to be called with failure information.
+    :param name: the label to mark inner scope failures (Mandatory)
+    :param handler: the handler function or handler object or None (Optional, default = None)
 
-    :return: scope (context manager) object
+    :return: New scope object
     """
     return Scope(_validate_label(name), _validate_handler(handler))
 

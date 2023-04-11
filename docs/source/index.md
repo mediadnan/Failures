@@ -22,13 +22,14 @@ from PyPI using the pip command
 pip install failures
 ````
 
-
 ````{toctree}
     :maxdepth: 2
     :hidden:
     :caption: User Guide
 
 guide/scopes
+guide/scoped_functions
+guide/handling_failures
 ````
 ````{toctree}
     :maxdepth: 1
@@ -36,4 +37,5 @@ guide/scopes
     :caption: About
 
 versions
+license
 ````
