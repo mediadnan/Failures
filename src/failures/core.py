@@ -132,6 +132,12 @@ class Failures(Failure):
 
 
 class Handler:
+    """
+    Custom failure handler that takes additional filtering information,
+    the handler takes care of recursively fetching failures within a failure group.
+
+    (Note: The handler object is not directly created by the used, but through the 'handler' function)
+    """
     __slots__ = ("handler_function", "ignore", "propagate")
 
     handler_function: FailureHandler
@@ -140,12 +146,6 @@ class Handler:
 
     def __init__(self, handler: FailureHandler, /, ignore: FailureFilters, propagate: FailureFilters) -> None:
         """
-        Custom failure handler that takes additional filtering information,
-        the handler takes care of recursively fetching failures within
-        a failure group.
-
-        (Note: The handler object is not directly created by the used, but through the 'handler' function)
-
         :param handler: function to be called with the failure details
         :param ignore: a tuple of exception types to be ignored
         :param propagate:  a tuple of exception types to be reraised
@@ -207,17 +207,17 @@ def handler_(   # underscored in module scope to allow un-shadowed used of the n
 
 
 class Scope:
+    """
+    Scope is an object that holds context information and used to catch,
+    label and handle any failures withing its scope using the handler object if present,
+    or re-raises the labeled failure to be captured by an outer layer scope.
+
+    (Note: The scope object is not directly created by the used, but through the 'scope' function)
+    """
     __slots__ = ('__name', '__qualname', '__subs', '__failures', '__handler', '__origin')
 
     def __init__(self, name: str, handler: Handler = None, /, root: 'Scope' = None, origin: 'Scope' = None) -> None:
         """
-        Scope is an object that holds context information and used
-        to catch, label and handle any failures withing its scope
-        using the handler object if present, or re-raises the labeled
-        failure to be captured by an outer layer scope.
-
-        (Note: The scope object is not directly created by the used, but through the 'scope' function)
-
         :param name: the label of the context (Mandatory)
         :param handler: the handler object (Optional, default = None)
         :param root: The scope object that created this one (Optional)

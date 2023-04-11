@@ -1,3 +1,3 @@
-# Bound failures scopes
+# Bound scopes
 
 TODO ...

@@ -23,19 +23,23 @@ pip install failures
 ````
 
 ````{toctree}
-    :maxdepth: 2
     :hidden:
     :caption: User Guide
-
+    :maxdepth: 2
 guide/scopes
 guide/scoped_functions
 guide/handling_failures
 ````
 ````{toctree}
+    :maxdepth: 2
+    :hidden:
+    :caption: API Reference
+api_ref
+````
+````{toctree}
     :maxdepth: 1
     :hidden:
     :caption: About
-
 versions
 license
 ````

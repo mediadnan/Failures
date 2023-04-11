@@ -1,3 +1,3 @@
-# Unbound failures scopes
+# Unbound scopes
 
 TODO ...
