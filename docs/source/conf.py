@@ -21,7 +21,7 @@ master_doc = 'index'
 exclude_patterns = []
 
 # Autodoc
-autodoc_mock_imports = ["typing_extensions"]
+# autodoc_mock_imports = ["typing_extensions"]
 
 # Theme
 html_theme = 'furo'
