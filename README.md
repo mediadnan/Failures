@@ -1,28 +1,31 @@
 <div id="readme_header" style="text-align: center">
-<h1>Failures</h1>
-<i>Labeling failures for humans</i>
-<br/><br/>
-<a href="https://github.com/mediadnan/Failures/actions/workflows/tests.yml"><img src="https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg" alt="Tests"/></a>
-<a href="https://codecov.io/gh/mediadnan/Failures"><img src="https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME" alt="CodeCov"/></a>
-<a href="https://www.python.org/downloads/"><img src="https://img.shields.io/pypi/pyversions/failures" alt="PyPI - Python Version"/></a>
-<a href="https://en.wikipedia.org/wiki/MIT_License"><img src="https://img.shields.io/github/license/mediadnan/failures" alt="License"/></a>
+<h1 style="color: #913946ff; font-family: Candara, sans-serif;">Failures</h1>
+<p style="color: #bf6572; font-family: Candara, sans-serif; font-style: italic">Labeling failures for humans</p>
+<br/>
+<a href="https://github.com/mediadnan/Failures/actions/workflows/tests.yml" target="_blank"><img src="https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg" alt="Tests"/></a>
+<a href="https://codecov.io/gh/mediadnan/Failures" target="_blank"><img src="https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME" alt="CodeCov"/></a>
+<a href="https://www.python.org/downloads/" target="_blank"><img src="https://img.shields.io/pypi/pyversions/failures" alt="PyPI - Python Version"/></a>
+<a href="https://en.wikipedia.org/wiki/MIT_License" target="_blank"><img src="https://img.shields.io/github/license/mediadnan/failures" alt="License"/></a>
+<a href="https://github.com/mediadnan/Failures/issues" target="_blank"><img src="https://img.shields.io/github/issues/mediadnan/failures" alt="GitHub issues" /></a>
+<a href="https://pypi.org/project/failures/" target="_blank"><img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/failures"></a>
 </div>
 
 ## What is failures
-Failures is a Python 3 module that contains utilities to explicitly label nested
-execution errors with fancy and simple syntax without coupling or adding extra ___context___ 
-arguments to the targeted functions.
+Failures is a python3 package that provides utilities to explicitly label nested
+failures _(errors)_ with simple syntax, and gives better flexibility on what errors
+to handle and how to handle them.
 
 ## Installation
 ``failures`` is available at PyPI, and requires python 3.8 or higher,
-you install it using the pip command:
+install it by executing the pip command:
 
 ```shell
 pip install failures
 ```
 
 > **Note**
-> Optionally you can install ``pip install "failures[colors]"`` to print failures with colors
+> This package comes with a default handler that prints failures to the standard output,
+> if you want them to be highlighted with colors, you can install ``pip install "failures[colors]"``
 
 ## Usage
 ### Failures scope _(context)_ 
