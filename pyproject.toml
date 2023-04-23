@@ -39,7 +39,7 @@ version = {attr = "failures.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
-colors = ["colorama>=0.4,<1.0"]
+colors = ["colorama>=0.4,<1.0", "types-colorama"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

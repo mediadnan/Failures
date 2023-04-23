@@ -96,7 +96,7 @@ def _match_all(_: Failure, /) -> Literal[True]:
 def _make_filter(spec: SupportedFilters) -> FailureFilter:
     """Creates a filter from specification"""
     if spec == '*' or spec is Exception:
-        return _match_all  # Optimisation
+        return _match_all  # optimising match
     if isinstance(spec, str):
         if '*' in spec:
             return FailureLabelPatternMatch(spec)
@@ -108,11 +108,15 @@ def _make_filter(spec: SupportedFilters) -> FailureFilter:
     raise TypeError(f"Unsupported filter type {type(spec).__name__!r}")
 
 
-def _validate_handler(obj: FailureHandler) -> FailureHandler:
-    """Validates the failure handler function"""
-    if not callable(obj):
-        raise TypeError("the handler must be a callable with signature: (Failure) -> None")
-    return obj
+if __debug__:
+    def _validate_handler(obj: FailureHandler) -> FailureHandler:
+        """Validates the failure handler function"""
+        if not callable(obj):
+            raise TypeError("the handler must be a callable with signature: (Failure) -> None")
+        return obj
+else:
+    def _validate_handler(obj: FailureHandler) -> FailureHandler:
+        return obj
 
 
 def filtered(handler: FailureHandler, *filters: Filters) -> FailureHandler:
@@ -158,9 +162,9 @@ def combine(handler: FailureHandler, *handlers: FailureHandler) -> FailureHandle
 
 
 @contextmanager
-def handle(handler: FailureHandler = print_failure) -> Generator[FailureHandler, None, None]:
+def handle(handler: FailureHandler = print_failure) -> Generator[None, None, None]:
     """Context manager that captures and handles failures"""
     try:
-        yield handler
+        yield
     except FailureException as err:
         handler(err.failure)

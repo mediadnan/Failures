@@ -112,7 +112,7 @@ def test_higher_exception_propagation_bound_scope(handler):
 
 def test_handle_without_handler():
     # ensures compatibility with v0.1
-    with pytest.raises(failures.Failure):
+    with pytest.raises(failures.FailureException):
         with failures.handle("testing", None):
             with failures.scope("scope"):
                 raise Exception("test_exception")
@@ -144,7 +144,7 @@ def test_supress_error_handling(handler, error):
 
 def test_failures_deprecated_add(error):
     # ensures compatibility with v0.1
-    from failures.core import Failures, Failure
-    fls = Failures(Failure('failure1', error), Failure('failure2', error))
+    from failures.core import Failures, FailureException
+    fls = Failures(FailureException('failure1', error), FailureException('failure2', error))
     with pytest.warns(DeprecationWarning):
-        fls.add(Failure('failure3', error))
+        fls.add(FailureException('failure3', error))

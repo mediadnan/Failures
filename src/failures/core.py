@@ -7,8 +7,8 @@ import functools
 import inspect
 from types import TracebackType
 from functools import cached_property
-from typing import (Optional, Type, List, Dict, Any, overload, Callable, Awaitable, NamedTuple,
-                    TypeVar, Union, Pattern, Tuple, Generic)
+from typing import (Optional, Type, List, Dict, Any, overload, Callable,
+                    Awaitable, NamedTuple, TypeVar, Union, Pattern, Tuple)
 
 if sys.version_info.minor >= 10:
     from typing import ParamSpec, TypeAlias
@@ -51,13 +51,18 @@ class Failure(NamedTuple):
     severity: Severity = NORMAL
 
 
-class FailureException(Exception, Generic[T]):
+class FailureException(Exception):
     """Wraps error to keep track of labeled sources"""
-    def __init__(self, source: str, error: Exception, reporter: T = None, **details):
-        self.source: str = source
-        self.error: Exception = error
-        self.reporter: Optional[T] = reporter
-        self.details: Dict[str, Any] = details
+    source: str
+    error: Exception
+    reporter: Optional['Reporter']
+    details: Dict[str, Any]
+
+    def __init__(self, source: str, error: Exception, reporter: 'Reporter' = None, **details):
+        self.source = source
+        self.error = error
+        self.reporter = reporter
+        self.details = details
 
     @property
     def failure(self) -> Failure:
@@ -83,15 +88,6 @@ def _is_validation_error(error: Exception) -> bool:
     return getattr(error, "__validation_error__", False)
 
 
-def _validate_label(label: str) -> str:
-    """Validates the name and returns it"""
-    if not isinstance(label, str):
-        raise _invalid(TypeError, "label must be a string")
-    elif not NamePattern.match(label):
-        raise _invalid(ValueError, f"invalid label: {label!r}")
-    return label
-
-
 class Reporter:
     """
     The reporter holds failures between function calls and generates
@@ -114,7 +110,10 @@ class Reporter:
         """
         if __debug__:
             # Validation is only evaluated when run without the -O or -OO python flag
-            _validate_label(name)
+            if not isinstance(name, str):
+                raise _invalid(TypeError, "label must be a string")
+            elif not NamePattern.match(name):
+                raise _invalid(ValueError, f"invalid label: {name!r}")
             if not isinstance(severity, Severity):
                 raise TypeError("'severity' can either be OPTIONAL, NORMAL or REQUIRED")
         self.__name = name

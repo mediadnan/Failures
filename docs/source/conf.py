@@ -23,6 +23,9 @@ exclude_patterns = []
 # Autodoc
 # autodoc_mock_imports = ["typing_extensions"]
 
+# MyST Parser
+myst_enable_extensions = ["attrs_block"]
+
 # Theme
 html_theme = 'furo'
 html_favicon = "../_static/icon.ico"

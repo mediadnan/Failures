@@ -7,7 +7,7 @@ and it becomes painful to maintain and monitor those errors as projects grow, es
 components that interact with each-other, so when a component fails, following tracebacks doesn't always give us
 an instantaneous picture about that failure.
 
-Failure comes with tools to tag _(label)_ with meaningful names code areas that might fail, so when a failure occurs
+FailureException comes with tools to tag _(label)_ with meaningful names code areas that might fail, so when a failure occurs
 in a nested component while processing some data, ``failures`` concatenates those labels from outer to inner and reports
 the actual error together with the source name _(which looks something like ``outer_tag.middle_tag.inner_tag``)_
 
@@ -26,9 +26,9 @@ pip install failures
     :hidden:
     :caption: User Guide
     :maxdepth: 2
+guide/reporter
 guide/scopes
-guide/scoped_functions
-guide/handling_failures
+guide/handlers
 ````
 ````{toctree}
     :maxdepth: 2

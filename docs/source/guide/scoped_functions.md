@@ -1,3 +1,0 @@
-# Scoped functions
-
-TODO ...

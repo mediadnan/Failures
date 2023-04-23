@@ -18,4 +18,9 @@ Scope object
     :members:
     :undoc-members:
 
+Scoped decorator
+----------------
+.. autofunction:: failures.scoped
 
+.. versionadded:: 0.2
+    added ``failures.scoped``

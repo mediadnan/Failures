@@ -92,13 +92,13 @@ def test_scope_child_name_and_qualname(stem: str, name, qualname):
 def test_scope_child_inheriting_handler(handler):
     root_scope = failures.scope('root', handler)
     child_scope = root_scope('child')
-    assert child_scope.handler is root_scope.handler
+    assert child_scope._handle is root_scope.handler
 
 
 def test_scope_child_overrides_handler(handler):
     root_scope = failures.scope('root', handler)
     child_scope = root_scope('child', handler)
-    assert child_scope.handler is not root_scope.handler
+    assert child_scope._handle is not root_scope.handler
 
 
 def test_duplicate_name_sub_scope():
@@ -150,28 +150,28 @@ def test_manual_error_gathering(handler, error):
             raise error
             result['first'] = object()  # noqa
         except Exception as err:
-            scope.add_failure(err)
+            scope.report(err)
             result['first'] = None
         # Labeled failure added without label
         try:
             fail(error)
             result['second'] = object()  # noqa
         except Exception as err:
-            scope.add_failure(err)
+            scope.report(err)
             result['second'] = None
         # Unlabeled failure added with label
         try:
             raise error
             result['third'] = object()  # noqa
         except Exception as err:
-            scope.add_failure(err, 'labeled')
+            scope.report(err, 'labeled')
             result['third'] = None
         # Labeled failure added with label
         try:
             fail(error)
             result['fourth'] = object()  # noqa
         except Exception as err:
-            scope.add_failure(err, 'labeled')
+            scope.report(err, 'labeled')
             result['fourth'] = None
         result['fifth'] = 'data'
     assert result['first'] is None, "alternative data for 'first' should be added"
@@ -198,7 +198,7 @@ def test_add_failure_validation(
 ):
     with pytest.raises(ExceptionType, match=err_msg):
         with failures.scope('handler', handler if handled else None) as scope:
-            scope.add_failure(*failure)  # noqa
+            scope.report(*failure)  # noqa
 
 
 def test_manual_handle_no_failures(handler, error):
@@ -227,7 +227,7 @@ def test_manual_handle_no_failures(handler, error):
     ], id='failures_passed'),
 ])
 def test_manual_handle_given_failure(handler, error, passed: str, registered: str, expected_passed, expected_registered):
-    from failures.core import Failures, Failure  # noqa (available for failure source)
+    from failures.core import Failures, FailureException  # noqa (available for failure source)
     scope = failures.scope('root', handler)
     for failure in eval(registered):
         scope.add_failure(failure)

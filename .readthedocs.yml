@@ -2,10 +2,7 @@
 # Read the Docs configuration file
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
 
-# Required
 version: 2
-
-# Set the version of Python and other tools you might need
 build:
   os: ubuntu-22.04
   tools:
@@ -15,15 +12,14 @@ build:
 sphinx:
    configuration: docs/source/conf.py
 
-# If using Sphinx, optionally build your docs in additional formats such as PDF
-# formats:
-#    - pdf
+#formats:
+#  - pdf
 
-# Optionally declare the Python requirements required to build your docs
+# Installing docs requirements and documented package
 python:
-   install:
-   - requirements: docs/requirements.txt
-   - method: pip
-     path: .
-     extra_requirements:
-       - colors
+  install:
+  - requirements: docs/requirements.txt
+  - method: pip
+    path: .
+    extra_requirements:
+      - colors
