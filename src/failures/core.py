@@ -1,43 +1,68 @@
-"""This module contains implementation of the core elements of the 'failures' library"""
-import inspect
+"""failures.core module implements the core utilities and object definition like the Reporter and scope..."""
 import re
-import types
+import sys
+import enum
+import asyncio
 import functools
-from warnings import warn
-from typing import (Union, Tuple, Optional, overload, TypeVar, Type, List, Generator, Set, Protocol, Callable, cast)
+import inspect
+from types import TracebackType
+from functools import cached_property
+from typing import (Optional, Type, List, Dict, Any, overload, Callable, Awaitable, NamedTuple,
+                    TypeVar, Union, Pattern, Tuple, Generic)
 
-# https://github.com/python/typeshed/pull/9850
-from typing_extensions import (  # type: ignore[attr-defined]
-    Self,
-    TypeAlias,
-    ParamSpec,
-    deprecated
-)
-
-from ._print import print_failure
+if sys.version_info.minor >= 10:
+    from typing import ParamSpec, TypeAlias
+else:
+    from typing_extensions import ParamSpec, TypeAlias
 
 
 # Type Aliases
-FailureOrFailures: TypeAlias = Union['Failure', 'Failures']
-AnyException = TypeVar('AnyException', bound=BaseException)
-AnyValue = TypeVar('AnyValue')
-FuncArgs = ParamSpec('FuncArgs')
-FailureFilter: TypeAlias = Union[Type[Exception]]  # will be adding source identifier in next version
-FailureFilters: TypeAlias = Tuple[FailureFilter, ...]
+T = TypeVar('T')
+P = ParamSpec('P')
 FunctionVar = TypeVar('FunctionVar', bound=Callable)
-SupportedFailureHandler: TypeAlias = Union['FailureHandler', 'Handler']
+FailureHandler: TypeAlias = Callable[['Failure'], None]
+SupportedFilters: TypeAlias = Union[str, Pattern[str], Type[Exception], 'Severity']
+FailureFilter: TypeAlias = Callable[['Failure'], bool]
+ExceptionTypes = Union[Type[Exception], Tuple[Type[Exception], ...]]
+Filters: TypeAlias = Union[SupportedFilters, Tuple[SupportedFilters, ...]]
+AnyException = TypeVar('AnyException', bound=BaseException)
 
-
-class FailureHandler(Protocol):  # signature of a failure handler function
-    def __call__(self, source: str, error: Exception, **kwargs) -> None:
-        """
-        Takes two positional arguments; the source of failure and the error that caused it.
-        kwargs in the other hand will hold additional details in the future
-        """
-
-
-# Regex Pre-compiled patterns
 NamePattern = re.compile(r'^(\w+(\[\w+]|\(\w+\))?)+([-.](\w+(\[\w+]|\(\w+\))?))*$')
+
+
+class Severity(enum.Enum):
+    """Specifies three levels to react to failures"""
+    OPTIONAL = 0    # ignores the failure
+    NORMAL = 1      # reports the failure
+    REQUIRED = 2    # raises the failure
+
+
+# Severity options shorthands
+OPTIONAL = Severity.OPTIONAL
+NORMAL = Severity.NORMAL
+REQUIRED = Severity.REQUIRED
+
+
+class Failure(NamedTuple):
+    """Container that holds a failure information"""
+    source: str
+    error: Exception
+    details: Dict[str, Any]
+    severity: Severity = NORMAL
+
+
+class FailureException(Exception, Generic[T]):
+    """Wraps error to keep track of labeled sources"""
+    def __init__(self, source: str, error: Exception, reporter: T = None, **details):
+        self.source: str = source
+        self.error: Exception = error
+        self.reporter: Optional[T] = reporter
+        self.details: Dict[str, Any] = details
+
+    @property
+    def failure(self) -> Failure:
+        """Gets the failure information"""
+        return Failure(self.source, self.error, self.details, REQUIRED)
 
 
 def _join(label1: str, label2: str) -> str:
@@ -67,295 +92,263 @@ def _validate_label(label: str) -> str:
     return label
 
 
-@overload
-def _validate_handler(handler: None) -> None: ...
-@overload
-def _validate_handler(handler: Union[FailureHandler, 'Handler']) -> 'Handler': ...
-
-
-def _validate_handler(handler: Union[FailureHandler, 'Handler', None]) -> Optional['Handler']:
-    """Validates the failure handler function"""
-    if handler is None:
-        return None
-    elif isinstance(handler, Handler):
-        return handler
-    return handler_(handler)
-
-
-def _label_failure(error: Union[Exception, 'Failure'], /, label: str) -> 'Failure':
+class Reporter:
     """
-    Helper functions that labels failures or error,
-    (No validation is performed for optimization)
+    The reporter holds failures between function calls and generates
+    sub reporters to pinpoint the source of each failure.
+
+    The reporter comes in three flavours;
+        - Reporter for NORMAL operations stores failures in a shared list to be handled later,
+        - Reporter for OPTIONAL operations just ignores failures, useful for expected ones,
+        - Reporter for REQUIRED operations raises the failure to ensure that next code blocks
+          are not evaluated until the failure is explicitly handled.
     """
-    if isinstance(error, (Failure, Failures)):
-        return error.within(label)
-    return Failure(label, error)
+    __slots__ = ('__name', '__failures', '__dict__')
+    __name: str
+    __failures: List[Failure]
 
+    def __init__(self, name: str, /, severity: Severity = NORMAL) -> None:
+        """
+        :param name: The label for the current reporter (mandatory)
+        :param severity: Specifies the operation type: OPTIONAL, NORMAL (default) or REQUIRED
+        """
+        if __debug__:
+            # Validation is only evaluated when run without the -O or -OO python flag
+            _validate_label(name)
+            if not isinstance(severity, Severity):
+                raise TypeError("'severity' can either be OPTIONAL, NORMAL or REQUIRED")
+        self.__name = name
+        self.__severity = severity
 
-class Failure(Exception):
-    """Wraps error to keep track of labeled sources"""
+    def __call__(self, name: str, /, severity: Severity = NORMAL) -> 'Reporter':
+        """
+        Creates a reporter child bound to the current one.
 
-    def __init__(self, source: str, error: Exception):
-        self.source: str = source
-        self.error: Exception = error
+        :param name: The label for the current reporter (mandatory)
+        :param severity: Specifies the operation type: OPTIONAL, NORMAL (default) or REQUIRED
+        :returns: New reporter object
+        """
+        return ReporterChild(name, self, severity)
 
-    def within(self, name: str) -> Self:
-        """Prepends the label (name) to the failure source name.source.(...)"""
-        self.source = _join(name, self.source)
-        return self
-
-
-class Failures(Failure):
-    """Wraps multiple failures as a group"""
-
-    def __init__(self, *failures: Failure) -> None:
-        self.__failures: List[Failure] = list(failures)
+    def __repr__(self) -> str:
+        return f'Reporter({self.label!r}, {self.severity.name})'
 
     @property
-    def failures(self) -> Generator[Failure, None, None]:
-        """Returns an iterator over registered failures"""
-        for failure in self.__failures:
-            if isinstance(failure, Failures):
-                yield from failure.failures
-            elif isinstance(failure, Failure):
-                yield failure
+    def parent(self) -> Optional['Reporter']:
+        """Gets nothing as this reporter has no parent"""
+        return
 
-    @deprecated("Failures.add method will be removed in next major releases")
-    def add(self, failure: Failure) -> None:
-        """Adds a new failure to the registered failures list"""
-        self.__failures.append(failure)
-
-    def within(self, name: str) -> Self:
-        """Prepends the label (name) to all the failures' sources"""
-        self.__failures = [failure.within(name) for failure in self.__failures]
+    @property
+    def root(self) -> 'Reporter':
+        """Gets this reporter as it's the first one"""
         return self
-
-
-class Handler:
-    """
-    Custom failure handler that takes additional filtering information,
-    the handler takes care of recursively fetching failures within a failure group.
-
-    (Note: The handler object is not directly created by the used, but through the 'handler' function)
-    """
-    __slots__ = ("handler_function", "ignore", "propagate")
-
-    handler_function: FailureHandler
-    ignore: FailureFilters
-    propagate: FailureFilters
-
-    def __init__(self, handler: FailureHandler, /, ignore: FailureFilters, propagate: FailureFilters) -> None:
-        """
-        :param handler: function to be called with the failure details
-        :param ignore: a tuple of exception types to be ignored
-        :param propagate:  a tuple of exception types to be reraised
-        """
-        self.handler_function = handler
-        self.ignore = ignore
-        self.propagate = propagate
-
-    @staticmethod
-    def _match(specification: FailureFilters, failure: FailureOrFailures) -> bool:
-        """Detects if the failure matches the specification"""
-        return bool(specification) and isinstance(failure.error, specification)
-
-    def __call__(self, failure: FailureOrFailures) -> None:
-        if isinstance(failure, Failures):
-            for failure in failure.failures:
-                self(failure)
-        elif isinstance(failure, Failure):
-            source, error = failure.source, failure.error
-            if self._match(self.ignore, failure):
-                return
-            elif self._match(self.propagate, failure):
-                raise failure from None
-            self.handler_function(source, error)
-
-
-def _prepare_filter_(flt: Union[FailureFilters, FailureFilter, None]) -> FailureFilters:
-    """Ensures that filters are a tuple"""
-    if flt is None:
-        return ()
-    elif not isinstance(flt, tuple):
-        return (flt,)
-    return flt
-
-
-def handler_(   # underscored in module scope to allow un-shadowed used of the name 'handler'
-        handler: SupportedFailureHandler = print_failure, /, *,
-        ignore: Union[FailureFilters, FailureFilter, None] = None,
-        propagate: Union[FailureFilters, FailureFilter, None] = None
-) -> Handler:
-    """
-    Creates a custom failure handler that takes additional filtering information.
-
-    :param handler: function to be called with the failure details (or handler object)
-    :param ignore: an exception type or a tuple of exception types to be ignored
-    :param propagate:  an exception type or a tuple of exception types to be reraised
-    """
-    ignore_ = _prepare_filter_(ignore)
-    propagate_ = _prepare_filter_(propagate)
-    while isinstance(handler, Handler):
-        # combines handler info
-        ignore_ = *handler.ignore, *ignore_
-        propagate_ = *handler.propagate, *propagate_
-        handler = handler.handler_function
-    if not callable(handler):
-        raise _invalid(TypeError, "failure handling function must be a callable object")
-    #                       optimizes filters and remove redundancy
-    return Handler(handler, tuple(set(ignore_)), tuple(set(propagate_)))
-
-
-class Scope:
-    """
-    Scope is an object that holds context information and used to catch,
-    label and handle any failures withing its scope using the handler object if present,
-    or re-raises the labeled failure to be captured by an outer layer scope.
-
-    (Note: The scope object is not directly created by the used, but through the 'scope' function)
-    """
-    __slots__ = ('__name', '__qualname', '__subs', '__failures', '__handler', '__origin')
-
-    def __init__(self, name: str, handler: Handler = None, /, root: 'Scope' = None, origin: 'Scope' = None) -> None:
-        """
-        :param name: the label of the context (Mandatory)
-        :param handler: the handler object (Optional, default = None)
-        :param root: The scope object that created this one (Optional)
-        :param origin: The scope object that created this one and all it's parents (Optional)
-        """
-        self.__name: str = name
-        self.__qualname: str = _join(root.qualname, name) if isinstance(root, Scope) else name
-        self.__subs: Set[str] = set()
-        self.__failures: List[Failure] = []
-        self.__handler: Optional[Handler] = handler
-        self.__origin: Optional[Scope] = origin
-
-    @overload
-    def __call__(self, name: str, /) -> 'Scope': ...
-    @overload
-    def __call__(self, name: str, handler: SupportedFailureHandler, /) -> 'Scope': ...
-
-    def __call__(self, name: str, handler: SupportedFailureHandler = None, /) -> 'Scope':
-        """
-        Creates a sub scope object that keep reference to this one as parent.
-
-        :param name: The label of the new sub scope (Mandatory)
-        :param handler: The handler function or Handler object (Optional, default = self.handler)
-        """
-        _name = _validate_label(name)
-        _handler = self.__handler if (handler is None) else _validate_handler(handler)
-        if _name in self.__subs:
-            warn(UserWarning(f"{_name!r} label has been used previously"), stacklevel=1, source=self)
-        else:
-            self.__subs.add(_name)
-        return Scope(_name, _handler, root=self, origin=(self.__origin or self))
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, _err_type, error, _err_tb) -> bool:
-        if (isinstance(error, BaseException) and not isinstance(error, Exception)) or _is_validation_error(error):
-            # Avoid handling higher exceptions (like KeyboardInterrupt)
-            # Or package validation error that are meant to be raised
-            return False
-        self.handle(error)
-        return True
 
     @property
     def name(self) -> str:
-        """The scope label (read-only)"""
+        """Gets the reporter's name (without parent names)."""
         return self.__name
 
     @property
-    def qualname(self) -> str:
-        """The scope fully qualified label (read-only)"""
-        return self.__qualname
+    def label(self) -> str:
+        """Gets the name of the current reporter"""
+        return self.__name
 
     @property
-    def handler(self) -> Optional[Handler]:
-        """The handler used by this scope or None (read-only)"""
-        return self.__handler
+    def failures(self) -> List[Failure]:
+        """Gets the list (mutable) where the reporter stores failures."""
+        try:
+            return self.__failures
+        except AttributeError:
+            _failures = []
+            self.__failures = _failures
+            return _failures
 
-    def add_failure(self, error: Union[Exception, Failure], /, label: str = None) -> None:
+    @property
+    def severity(self) -> Severity:
+        """Gets the severity level of the current reporter."""
+        return self.__severity
+
+    def report(self, error: Exception, **details) -> None:
         """
-        Registers the error with an optional label to be handled later.
+        The reporter treats the failure depending on the severity flag,
 
-        :param error: exception or a pre-wrapped failure (Mandatory)
-        :param label: if a label is passed, it will be prepended to the failure's source (Optional)
+        :param error: A regular exception or a pre-labeled failure
+        :param details: Any additional details to be reported with the failure
+        :returns: None
         """
-        if not isinstance(error, Exception):
-            raise _invalid(TypeError, f"invalid error type {type(error).__name__!r}")
-        if label is not None:
-            error = _label_failure(error, _validate_label(label))
-        if not getattr(error, '__from_child_scope__', False):
-            error = _label_failure(error, self.__qualname)
-        if self.__origin is not None:
-            setattr(error, '__from_child_scope__', True)
-            self.__origin.add_failure(error)
-        else:
-            self.__failures.append(cast(Failure, error))
+        source = self.label
+        severity = self.severity
+        if severity is OPTIONAL:
+            # Ignores the failure
+            return
+        if isinstance(error, FailureException):
+            # Unwrap labeled failures
+            source = _join(source, error.source)
+            details = {**details, **error.details}
+            error = error.error
+        if severity is REQUIRED:
+            # Raises the failure as exception
+            raise FailureException(source, error, self, **details)
+        self.failures.append(Failure(source, error, details))
 
-    def handle(self, error: Union[Exception, Failures, Failure] = None) -> None:
+    def handle(self, handler: FailureHandler) -> None:
+        """Calls the handler function with each registered failure"""
+        for failure in self.failures:
+            handler(failure)
+
+    def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Handles all registered failures (and optionally also the argument) if a handler
-        is passed to the scope, otherwise, gathers all the failures and raises
-        them to the higher scope to be captured.
+        Calls the function in a safe context and reports the failure if it occurs
 
-        :param error: either a failure, a failures or a normal exception object (Optional)
+        :param func: The function to be called in a safe context
+        :param args: Any positional arguments expected by func
+        :param kwargs: Any keyword arguments expected by func
+        :returns: The returned value of func or None if it fails
         """
-        if isinstance(error, Exception):
-            self.add_failure(error)
-        if not self.__failures:
-            return  # Nothing to handle
-        failure = Failures(*self.__failures) if len(self.__failures) > 1 else self.__failures[0]  # optimization
-        if self.__handler is None:
-            raise failure
-        self.__handler(failure)
-        self.__failures = []
+        try:
+            return func(*args, **kwargs)
+        except Exception as err:
+            self.report(err)
+
+    async def safe_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls the coroutine function in a safe context and reports the failure if it occurs
+
+        :param func: The coroutine function to be called in a safe context
+        :param args: Any positional arguments expected by func
+        :param kwargs: Any keyword arguments expected by func
+        :returns: The returned value of func or None if it fails
+        """
+        try:
+            return await func(*args, **kwargs)
+        except Exception as err:
+            self.report(err)
 
 
-def scope(name: str, handler: SupportedFailureHandler = None) -> Scope:
+class ReporterChild(Reporter):
+    __slots__ = ('__parent',)
+    __parent: Reporter
+
+    def __init__(self, name: str, /, parent: Reporter, severity: Severity = NORMAL) -> None:
+        if __debug__:
+            if not isinstance(parent, Reporter):
+                raise TypeError("'parent' must be instance of Reporter")
+        Reporter.__init__(self, name, severity)
+        self.__parent = parent
+        self.__failures = parent.failures
+
+    @property
+    def parent(self) -> Reporter:
+        """Gets the reporter that created this one"""
+        return self.__parent
+
+    @cached_property
+    def root(self) -> Reporter:
+        """Gets the first parent of this reporter"""
+        return self.__parent.root
+
+    @cached_property
+    def label(self) -> str:
+        """Gets the hierarchical name of this reporter"""
+        return _join(self.parent.label, self.__name)
+
+
+class scope:
     """
-    Creates a labeled failure's scope object with and optional handler,
-    if the handler is provided, failures within scope will be handled locally,
-    otherwise the error will be raised with a label.
-
-    :param name: the label to mark inner scope failures (Mandatory)
-    :param handler: the handler function or handler object or None (Optional, default = None)
-
-    :return: New scope object
+    Scope is a context manager object that capture error or pre-labeled failures and prepends its label
+    then re-raise it, any error within the scope will be labeled and raised with a REQUIRED flag
+    to prevent the execution of next blocks avoiding name errors or unexpected bugs
     """
-    return Scope(_validate_label(name), _validate_handler(handler))
+    __slots__ = ('__reporter', '__details')
+    __reporter: Reporter
+    __details: Dict[str, Any]
+
+    def __init__(self, name: str, /, reporter: Reporter = None, **details) -> None:
+        """
+        :param name: The label for the current scope (mandatory)
+        :param reporter: The reported to be passed inside the scope (optional)
+        :param details: Any additional information to be reported (optional)
+        """
+        if __debug__:
+            if not (reporter is None or isinstance(reporter, Reporter)):
+                raise TypeError("'reporter' must be instance of Reporter")
+        self.__reporter = (reporter or Reporter)(name, REQUIRED)
+        self.__details = details
+
+    def __enter__(self) -> Reporter:
+        return self.__reporter
+
+    def __exit__(self,
+                 _err_type: Type[BaseException] = None,
+                 error: BaseException = None,
+                 _err_tb: TracebackType = None) -> bool:
+        if error is None:
+            return True
+        elif isinstance(error, Exception):
+            self.__reporter.report(error, **self.__details)
+        # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
+        # Or module validation errors that must be raised
+        return False
 
 
 @overload
 def scoped(function: FunctionVar, /) -> FunctionVar: ...
 @overload
-def scoped(*, name: str = ..., handler: SupportedFailureHandler = ...) -> Callable[[FunctionVar], FunctionVar]: ...
+def scoped(*, name: str = ...) -> Callable[[FunctionVar], FunctionVar]: ...
 
 
-def scoped(func: FunctionVar = None, /, *, name: str = None, handler: SupportedFailureHandler = None):
+def scoped(function: FunctionVar = None, /, *, name: str = None):
     """
     A decorator used over functions to add a labeled failures scope,
     by default, the label will be the function's name, but
-    it could be overridden with a custom label.
-
-    The decorator also takes an optional local failure handler.
+    it could be overridden with a custom label
     """
-    def decorator(function: Callable[FuncArgs, AnyValue], /) -> Callable[FuncArgs, AnyValue]:
+    def decorator(func: FunctionVar, /) -> FunctionVar:
         """Ready to used 'failures.scoped' decorator"""
-        if not isinstance(function, types.FunctionType):
-            raise _invalid(TypeError, "failures.scoped only supports decorating standard functions")
+        if not callable(func):
+            raise _invalid(TypeError, "failures.scoped decorator expects a functions")
+        name_ = name if name is not None else func.__name__
+        is_async = asyncio.iscoroutinefunction(func)
+        spec = inspect.getfullargspec(func)
+        rep_name = 'reporter'
+        for idx, _arg in enumerate(spec.args):
+            if _arg != rep_name:
+                continue
 
-        nonlocal name
-        if name is None:
-            name = function.__name__
-
-        def wrapper(*args: FuncArgs.args, **kwargs: FuncArgs.kwargs) -> AnyValue:
-            with scope(name, handler):
-                return function(*args, **kwargs)
-        wrapper.__signature__ = inspect.signature(function)
-        return functools.update_wrapper(wrapper, function)
-    if func is None:
-        return decorator
-    return decorator(func)
+            def _new_args(args, rep):
+                _args = list(args)
+                _args[idx] = rep
+                return _args
+            idx = spec.args.index(rep_name)
+            if is_async:
+                async def wrapper(*args, **kwargs):
+                    with scope(name_, args[idx]) as rep:
+                        return await func(*_new_args(args, rep), **kwargs)
+            else:
+                def wrapper(*args, **kwargs):
+                    with scope(name_, args[idx]) as rep:
+                        return func(*_new_args(args, rep), **kwargs)
+            break
+        else:
+            if rep_name in spec.kwonlyargs:
+                if is_async:
+                    async def wrapper(*args, **kwargs):
+                        with scope(name_, kwargs.pop(rep_name)) as rep:
+                            kwargs[rep_name] = rep
+                            return await func(*args, **kwargs)
+                else:
+                    def wrapper(*args, **kwargs):
+                        with scope(name_, kwargs.pop(rep_name)) as rep:
+                            kwargs[rep_name] = rep
+                            return func(*args, **kwargs)
+            elif is_async:
+                async def wrapper(*args, **kwargs):
+                    with scope(name_):
+                        return await func(*args, **kwargs)
+            else:
+                def wrapper(*args, **kwargs):
+                    with scope(name_):
+                        return func(*args, **kwargs)
+        wrapper.__signature__ = inspect.signature(func)
+        return functools.update_wrapper(wrapper, func)
+    return decorator if function is None else decorator(function)
