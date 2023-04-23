@@ -23,19 +23,123 @@ those sub reporters always keep reference of their parent reporter and can be us
 these failures are stored in a shared list that can be accessed through any of those reporters,
 this way all failures can be handled after that the function has returned.
 
-## Failures
-TODO / define the failure
-
 ## Creating a reporter
 
-TODO / name conventions
-TODO / calling report()
+The reporter is firstly created using ``failures.Reporter`` constructor that expects a name as mandatory positional-only argument,
+
+````python
+>>> from failures import Reporter
+>>> reporter = Reporter('my_first_reporter')
+>>> reporter
+Reporter('my_first_reporter', NORMAL)
+````
+
+This reporter can be used now for storing failures:
+
+````python
+>>> reporter.report(ValueError("this is a value error"))
+>>> reporter.report(TypeError("this is a type error"))
+>>> reporter.report(KeyError("this is a key error"))
+>>> for failure in reporter.failures:
+...   print(failure)
+Failure(source='my_first_reporter', error=ValueError('this is a value error'), details={}, severity=<Severity.NORMAL: 1>)
+Failure(source='my_first_reporter', error=TypeError('this is a type error'), details={}, severity=<Severity.NORMAL: 1>)
+Failure(source='my_first_reporter', error=KeyError('this is a key error'), details={}, severity=<Severity.NORMAL: 1>)
+````
+
+### Failures
+As shown in the previous example, the reporter encapsulates errors in a **named tuple** object 
+together with its _source_ _severity_ and optionally additional details as a dict.
+
+The attributes can be either accesses as members ``failure.source`` or as items ``failure[0]``.
+
+For more details, please refer to the {func}`failures.Failure` API reference
+
+### Naming conventions
+The name however must be a non-empty string, and can only contain letters, digits, ``-`` and ``_``,
+like ``root``, ``evaluate_percentage``, ``func1``, ``get-item-price`` ...
+And if for some reason the reporter needs multiple labels, this is allowed by joining those labels with dots,
+like ``items.counter``. The name can also end with parenthesis or brackets containing those the previously mentioned
+characters, like ``Iteration[64]``, ``branch[main]`` or ``Inbox(new)``.
+
+The library will complain with **value errors** for invalid name patterns, such as ``items..counter``,
+``branch[main)``, ``-toUpper``, ``(main branch)`` ...
+This validation mechanism helps ensuring a good labeling quality, as this is a main features of this library.
 
 ## Sub reporters
 
-TODO / created sub reporter
-TODO / creating sub, sub reporter
-TODO / comparing nodes' API (name, parent, root, label)
+We can derive a new reporter from an existing one the same way we create a new reporter,
+this is achieved by calling the reporter with a new name like this
+
+```python
+>>> from failures import Reporter
+>>> reporter = Reporter('main')
+>>> sub_reporter = reporter('sub')
+>>> sub_reporter
+Reporter('main.sub', NORMAL)
+```
+
+We can keep deriving sub reporters as much as we need, like:
+
+````python
+>>> sub_sub = sub_reporter('sub')
+>>> sub_sub
+Reporter('main.sub.sub')
+>>> sub_sub('sub_again')
+Reporter('main.sub.sub.sub_again')
+````
+And this will help us when passing reporters to functions as arguments,
+as they keep track of their origin. Making them the perfect tool to pinpoint
+the source of the failure.
+
+Now let's explore some common reporter properties and compare them
+
+```python
+>>> # reporter's label
+>>> reporter.label
+'main'
+>>> sub_reporter.label
+'main.sub'
+>>> sub_sub.label
+'main.sub.sub'
+>>> # reporter's parent
+>>> reporter.parent  # None
+
+>>> sub_reporter.parent
+Reporter('main', NORMAL)
+>>> sub_sub.parent
+Reporter('main.sub', NORMAL)
+>>> # reporter's root
+>>> reporter.root  # self
+Reporter('main', NORMAL)
+>>> sub_reporter.root
+Reporter('main', NORMAL)
+>>> sub_sub.root
+Reporter('main', NORMAL)
+>>> # reporter's name
+>>> reporter.name
+'main'
+>>> sub_reporter.name
+'sub'
+>>> sub_sub.name
+'sub'
+```
+
+As shown in this example, the ``label`` property gets the full combined tree names of the reporter, 
+the ``name`` property only gets the current reporter's name, the ``parent`` property returns
+the reporter's parent if there is one and the ``root`` property returns the first reporter
+of the tree.
+
+Reporters are made to report failures, and we can report from each report as they share the same failures' list,
+
+````python
+>>> reporter.report(TypeError('test type error'))
+>>> sub_reporter.report(Exception('test generic error'))
+>>> sub_sub.report(TabError('test error error'))
+>>> reporter.failures
+
+````
+
 TODO / calling report() from each
 TODO / accessing failures from each
 

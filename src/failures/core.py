@@ -154,13 +154,12 @@ class Reporter:
 
     @property
     def failures(self) -> List[Failure]:
-        """Gets the list (mutable) where the reporter stores failures."""
+        """Gets the failures' list (mutable)"""
         try:
             return self.__failures
         except AttributeError:
-            _failures = []
-            self.__failures = _failures
-            return _failures
+            self.__failures = []
+            return self.__failures
 
     @property
     def severity(self) -> Severity:
@@ -234,7 +233,6 @@ class ReporterChild(Reporter):
                 raise TypeError("'parent' must be instance of Reporter")
         Reporter.__init__(self, name, severity)
         self.__parent = parent
-        self.__failures = parent.failures
 
     @property
     def parent(self) -> Reporter:
@@ -249,7 +247,12 @@ class ReporterChild(Reporter):
     @cached_property
     def label(self) -> str:
         """Gets the hierarchical name of this reporter"""
-        return _join(self.parent.label, self.__name)
+        return _join(self.parent.label, self.name)
+
+    @property
+    def failures(self) -> List[Failure]:
+        """Gets the root's failures list (mutable)"""
+        return self.root.failures
 
 
 class scope:
