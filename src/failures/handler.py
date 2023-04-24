@@ -8,11 +8,11 @@ try:
     import colorama
 except ImportError:
     colorama = None
-    _template = "[{level}] {source} :: {err_type}({error}) {time}"
+    _template = "[FAILURE] {source} :: {err_type}({error}) {time}"
 else:
     colorama.just_fix_windows_console()
     _template = (
-        f"{colorama.Style.BRIGHT + colorama.Fore.LIGHTRED_EX}[{{level}}] "
+        f"{colorama.Style.BRIGHT + colorama.Fore.LIGHTRED_EX}[FAILURE] "
         f"{colorama.Style.BRIGHT + colorama.Fore.WHITE}{{source}}{colorama.Style.RESET_ALL} :: "
         f"{colorama.Style.BRIGHT + colorama.Fore.LIGHTRED_EX}{{err_type}}({colorama.Style.RESET_ALL}"
         f"{colorama.Fore.LIGHTWHITE_EX}{{error}}{colorama.Fore.RESET}"
@@ -20,8 +20,8 @@ else:
         f"{colorama.Style.DIM + colorama.Fore.CYAN}{{time}}{colorama.Fore.RESET}{colorama.Style.RESET_ALL}"
     )
 
-from .core import (Failure, FailureHandler, FailureException, Severity,
-                   SupportedFilters, FailureFilter, ExceptionTypes, Filters)
+from .core import (Failure, FailureHandler, FailureException, Filters,
+                   SupportedFilters, FailureFilter, ExceptionTypes)
 
 
 def print_failure(failure: Failure, /) -> None:
@@ -29,9 +29,8 @@ def print_failure(failure: Failure, /) -> None:
     error = failure.error
     source = failure.source
     err_type = type(error).__name__
-    level = 'FAILURE' if failure.severity is Severity.REQUIRED else 'WARNING'
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(_template.format(source=source, err_type=err_type, error=error, time=time, level=level))
+    print(_template.format(source=source, err_type=err_type, error=error, time=time))
 
 
 class FailureMatch(abc.ABC):
@@ -64,18 +63,6 @@ class FailureLabelPatternMatch(FailureMatch):
         return bool(self.pattern.match(failure.source))
 
 
-class FailureSeverityMatch(FailureMatch):
-    __slots__ = ('severity',)
-    severity: Severity
-
-    def __init__(self, severity: Severity, /) -> None:
-        self.severity = severity
-
-    def __call__(self, failure: Failure, /) -> bool:
-        """Checks if the failure's severity matches the specification"""
-        return failure.severity is self.severity
-
-
 class FailureExceptionMatch(FailureMatch):
     __slots__ = ('exc_type',)
     exc_type: ExceptionTypes
@@ -101,8 +88,6 @@ def _make_filter(spec: SupportedFilters) -> FailureFilter:
         if '*' in spec:
             return FailureLabelPatternMatch(spec)
         return FailureLabelMatch(spec)
-    if isinstance(spec, Severity):
-        return FailureSeverityMatch(spec)
     if isinstance(spec, type) and issubclass(spec, Exception):
         return FailureExceptionMatch(spec)
     raise TypeError(f"Unsupported filter type {type(spec).__name__!r}")

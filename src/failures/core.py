@@ -1,19 +1,24 @@
 """failures.core module implements the core utilities and object definition like the Reporter and scope..."""
 import re
-import sys
 import enum
-import asyncio
-import functools
-import inspect
 from types import TracebackType
 from functools import cached_property
-from typing import (Optional, Type, List, Dict, Any, overload, Callable,
+from typing import (Optional, Type, List, Dict, Any, Callable,
                     Awaitable, NamedTuple, TypeVar, Union, Pattern, Tuple)
 
-if sys.version_info.minor >= 10:
-    from typing import ParamSpec, TypeAlias
-else:
-    from typing_extensions import ParamSpec, TypeAlias, Self
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+try:
+    from typing import TypeAlias
+except ImportError:
+    from typing_extensions import TypeAlias
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
 
 # Type Aliases
 T = TypeVar('T')
@@ -30,7 +35,7 @@ NamePattern = re.compile(r'^(\w+(\[\w+]|\(\w+\))?)+([-.](\w+(\[\w+]|\(\w+\))?))*
 
 
 class Severity(enum.Enum):
-    """Specifies three levels to react to failures"""
+    """Specify three levels to react to failures"""
     OPTIONAL = 0  # ignores the failure
     NORMAL = 1  # reports the failure
     REQUIRED = 2  # raises the failure
@@ -47,7 +52,6 @@ class Failure(NamedTuple):
     source: str
     error: Exception
     details: Dict[str, Any]
-    severity: Severity = NORMAL
 
 
 class FailureException(Exception):
@@ -161,8 +165,7 @@ class Reporter:
     def failure(self, error: Exception, **details) -> Failure:
         """Creates a failure from error, details and reporter's information"""
         source = self.label
-        if (isinstance(error, FailureException) and
-                error.reporter.root is not self.root):
+        if isinstance(error, FailureException) and error.reporter.root is not self.root:
             # Unwrap labeled failures
             source = _join(source, error.source)
             details = {**details, **error.details}
@@ -195,6 +198,64 @@ class Reporter:
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
         # Or module validation errors that must be raised
         return False
+
+    def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls func(*args, **kwargs) inside a safe block and returns its result if
+        it succeeds, or returns None and report the failure otherwise.
+        """
+        try:
+            return func(*args, **kwargs)
+        except Exception as err:
+            self.report(err)
+
+    async def safe_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls await func(*args, **kwargs) inside a safe block and returns its result if
+        it succeeds, or returns None and report the failure otherwise.
+        """
+        try:
+            return await func(*args, **kwargs)
+        except Exception as err:
+            self.report(err)
+
+    @staticmethod
+    def optional(func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls func(*args, **kwargs) inside a safe block and returns its result if
+        it succeeds, or returns None and ignores the failure otherwise.
+        """
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            return
+
+    @staticmethod
+    async def optional_async(func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls await func(*args, **kwargs) inside a safe block and returns its result if
+        it succeeds, or returns None and ignores the failure otherwise.
+        """
+        try:
+            return await func(*args, **kwargs)
+        except Exception:
+            return
+
+    def required(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+        """
+        Calls func(*args, **kwargs) inside a safe block and returns its result if
+        it succeeds, or raises a labeled failure otherwise.
+        """
+        with self:
+            return func(*args, **kwargs)
+
+    async def required_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> T:
+        """
+        Calls await func(*args, **kwargs) inside a safe block and returns its result if
+        it succeeds, or raises a labeled failure otherwise.
+        """
+        with self:
+            return await func(*args, **kwargs)
 
 
 class ReporterChild(Reporter):
@@ -265,80 +326,3 @@ class scope:
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
         # Or module validation errors that must be raised
         return False
-
-
-def optional(func: Callable[P, T], /) -> Callable[P, Optional[T]]:
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            return
-
-    return wrapper
-
-
-@overload
-def scoped(function: FunctionVar, /) -> FunctionVar: ...
-
-
-@overload
-def scoped(*, name: str = ...) -> Callable[[FunctionVar], FunctionVar]: ...
-
-
-def scoped(function: FunctionVar = None, /, *, name: str = None):
-    """
-    A decorator used over functions to add a labeled failures scope,
-    by default, the label will be the function's name, but
-    it could be overridden with a custom label
-    """
-
-    def decorator(func: FunctionVar, /) -> FunctionVar:
-        """Ready to used 'failures.scoped' decorator"""
-        if not callable(func):
-            raise _invalid(TypeError, "failures.scoped decorator expects a functions")
-        name_ = name if name is not None else func.__name__
-        is_async = asyncio.iscoroutinefunction(func)
-        spec = inspect.getfullargspec(func)
-        rep_name = 'reporter'
-        for idx, _arg in enumerate(spec.args):
-            if _arg != rep_name:
-                continue
-
-            def _new_args(args, rep):
-                _args = list(args)
-                _args[idx] = rep
-                return _args
-
-            if is_async:
-                async def wrapper(*args, **kwargs):
-                    with scope(name_, args[idx]) as rep:
-                        return await func(*_new_args(args, rep), **kwargs)
-            else:
-                def wrapper(*args, **kwargs):
-                    with scope(name_, args[idx]) as rep:
-                        return func(*_new_args(args, rep), **kwargs)
-            break
-        else:
-            if rep_name in spec.kwonlyargs:
-                if is_async:
-                    async def wrapper(*args, **kwargs):
-                        with scope(name_, kwargs.pop(rep_name)) as rep:
-                            kwargs[rep_name] = rep
-                            return await func(*args, **kwargs)
-                else:
-                    def wrapper(*args, **kwargs):
-                        with scope(name_, kwargs.pop(rep_name)) as rep:
-                            kwargs[rep_name] = rep
-                            return func(*args, **kwargs)
-            elif is_async:
-                async def wrapper(*args, **kwargs):
-                    with scope(name_):
-                        return await func(*args, **kwargs)
-            else:
-                def wrapper(*args, **kwargs):
-                    with scope(name_):
-                        return func(*args, **kwargs)
-        wrapper.__signature__ = inspect.signature(func)
-        return functools.update_wrapper(wrapper, func)
-
-    return decorator if function is None else decorator(function)

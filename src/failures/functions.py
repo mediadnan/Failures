@@ -1,15 +1,11 @@
 import functools
 import types
 import inspect
-from typing import TypeVar, Callable, Any, Optional, Union, Dict, Tuple
+from typing import Callable, Any, Optional, Union, Dict, Tuple, overload
 
-from typing_extensions import ParamSpec, get_origin, get_args
+from typing_extensions import get_origin, get_args
 
-from .core import Reporter, FailureHandler, FailureException
-
-T = TypeVar('T')
-P = ParamSpec('P')
-FunctionVar = TypeVar('FunctionVar', bound=Callable)
+from .core import Reporter, P, T, FunctionVar
 
 REPORTER_ARG_NAME = 'reporter'
 NOTSET = object()
@@ -76,66 +72,53 @@ def get_func_name(func: FunctionVar, /) -> str:
     return func.__name__
 
 
-def _decorator(
-        func_: Optional[FunctionVar], name_: Optional[str], handler: Callable[[Reporter, Exception], None]
-) -> Union[FunctionVar, Callable[[FunctionVar], FunctionVar]]:
-    def decorator(func: FunctionVar, /) -> FunctionVar:
-        if not callable(func):
-            raise TypeError("decorated function must be callable")
-        func, _get, _set = detect_signature_reporter(func)
-        name = name_ or get_func_name(func)
-        if is_async(func):
+@overload
+def scoped(func: FunctionVar, /) -> FunctionVar: ...
+@overload
+def scoped(name: str = ..., /) -> Callable[[FunctionVar], FunctionVar]: ...
+
+
+def scoped(arg: Union[FunctionVar, str, None] = None, /) -> Union[FunctionVar, Callable[[FunctionVar], FunctionVar]]:
+    """
+    Decorates functions to intercept any inner failures and add
+    the function name to its label, and also add the function's
+    name to any reporter passed as argument to that function.
+
+    This decorator can be either parametrized or not.
+
+    >>> @scoped
+    ... def function(*args, **kwars):
+    ...     pass
+
+    or
+
+    >>> @scoped('my_function')
+    ... def function(*args, **kwars):
+    ...     pass
+    """
+    def decorator(func_: FunctionVar, /, name: str = None) -> FunctionVar:
+        if not callable(func_):
+            raise TypeError("@scoped decorator expects a function")
+        func_, _get, _set = detect_signature_reporter(func_)
+        name_ = name or get_func_name(func_)
+        if is_async(func_):
             async def wrap(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-                reporter = (_get(args, kwargs) or Reporter)(name)
+                reporter = (_get(args, kwargs) or Reporter)(name_)
                 args, kwargs = _set(args, kwargs, reporter)
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as error:
-                    handler(reporter, error)
+                with reporter:
+                    return await func_(*args, **kwargs)
         else:
             def wrap(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-                reporter = (_get(args, kwargs) or Reporter)(name)
+                reporter = (_get(args, kwargs) or Reporter)(name_)
                 args, kwargs = _set(args, kwargs, reporter)
-                try:
-                    return func(*args, **kwargs)
-                except Exception as error:
-                    handler(reporter, error)
-        wrap.__signature__ = inspect.signature(func)
-        return functools.update_wrapper(wrap, func)
-    return decorator if func_ is None else decorator(func_)
-
-
-def _ignore_failure(_reporter: Reporter, _error: Exception) -> None:
-    return
-
-
-def _report_failure(reporter: Reporter, error: Exception) -> None:
-    reporter.report(error)
-
-
-def _propagate_failure(reporter: Reporter, error: Exception) -> None:
-    raise FailureException(reporter.failure(error), reporter)
-
-
-def optional(func: Callable[P, T] = None, /, *, name: str = None):
-    return _decorator(func, name, _ignore_failure)
-
-
-def safe(func: Callable[P, T] = None, /, *, name: str = None):
-    return _decorator(func, name, _report_failure)
-
-
-def labeled(func: Callable[P, T] = None, /, *, name: str = None):
-    return _decorator(func, name, _propagate_failure)
-
-
-def get_optional(reporter: Reporter, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-    pass
-
-
-def get(reporter: Reporter, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-    pass
-
-
-def get_required(reporter: Reporter, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
-    pass
+                with reporter:
+                    return func_(*args, **kwargs)
+        wrap.__signature__ = inspect.signature(func_)
+        return functools.update_wrapper(wrap, func_)
+    if arg is None:
+        return decorator
+    elif callable(arg):
+        return decorator(arg)
+    elif isinstance(arg, str):
+        return lambda func: decorator(func, arg)
+    raise TypeError("@scoped decorator expects a callable as first argument")

@@ -1,6 +1,7 @@
-"""Failures package provides tools to label and track errors anywhere in your code easily"""
-from .core import Reporter, scope, scoped, Failure, FailureException, Severity, OPTIONAL, NORMAL, REQUIRED
+"""This library provides tools to label and handle errors anywhere in your code easily"""
+from .core import Reporter, Failure, FailureException
 from .handler import handle, filtered, combine, print_failure
+from .functions import scoped
 
 # -------------------------------- WARNING! -------------------------------- #
 #                                                                            #
