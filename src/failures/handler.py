@@ -167,4 +167,5 @@ def handle(handler: FailureHandler = print_failure) -> Generator[None, None, Non
     try:
         yield
     except FailureException as err:
-        handler(err.failure)
+        for failure in (err.failure, *err.reporter.failures):
+            handler(failure)

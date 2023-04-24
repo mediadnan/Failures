@@ -44,7 +44,7 @@ REQUIRED = Severity.REQUIRED
 
 
 class Failure(NamedTuple):
-    """Container that holds a failure information"""
+    """Container that holds failure information"""
     source: str
     error: Exception
     details: Dict[str, Any]
@@ -127,7 +127,7 @@ class Reporter:
         :param severity: Specifies the operation type: OPTIONAL, NORMAL (default) or REQUIRED
         :returns: New reporter object
         """
-        return ReporterChild(name, self, severity)
+        return ReporterChild(name, severity, self)
 
     def __repr__(self) -> str:
         return f'Reporter({self.label!r}, {self.severity.name})'
@@ -168,7 +168,7 @@ class Reporter:
 
     def report(self, error: Exception, **details) -> None:
         """
-        The reporter treats the failure depending on the severity flag,
+        The reporter treats the failure depending on the severity flag.
 
         :param error: A regular exception or a pre-labeled failure
         :param details: Any additional details to be reported with the failure
@@ -188,11 +188,6 @@ class Reporter:
             # Raises the failure as exception
             raise FailureException(source, error, self, **details)
         self.failures.append(Failure(source, error, details))
-
-    def handle(self, handler: FailureHandler) -> None:
-        """Calls the handler function with each registered failure"""
-        for failure in self.failures:
-            handler(failure)
 
     def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
@@ -227,7 +222,7 @@ class ReporterChild(Reporter):
     __slots__ = ('__parent',)
     __parent: Reporter
 
-    def __init__(self, name: str, /, parent: Reporter, severity: Severity = NORMAL) -> None:
+    def __init__(self, name: str, /, severity: Severity, parent: Reporter) -> None:
         if __debug__:
             if not isinstance(parent, Reporter):
                 raise TypeError("'parent' must be instance of Reporter")

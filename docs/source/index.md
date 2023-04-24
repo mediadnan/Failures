@@ -28,7 +28,7 @@ pip install failures
     :maxdepth: 2
 guide/reporter
 guide/scopes
-guide/handlers
+guide/handler
 ````
 ````{toctree}
     :maxdepth: 2
