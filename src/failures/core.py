@@ -31,9 +31,9 @@ NamePattern = re.compile(r'^(\w+(\[\w+]|\(\w+\))?)+([-.](\w+(\[\w+]|\(\w+\))?))*
 
 class Severity(enum.Enum):
     """Specifies three levels to react to failures"""
-    OPTIONAL = 0    # ignores the failure
-    NORMAL = 1      # reports the failure
-    REQUIRED = 2    # raises the failure
+    OPTIONAL = 0  # ignores the failure
+    NORMAL = 1  # reports the failure
+    REQUIRED = 2  # raises the failure
 
 
 # Severity options shorthands
@@ -158,10 +158,11 @@ class Reporter:
             self.__failures = []
             return self.__failures
 
-    def _prepare(self, error: Exception, details: Dict[str, Any]) -> Failure:
+    def failure(self, error: Exception, **details) -> Failure:
         """Creates a failure from error, details and reporter's information"""
         source = self.label
-        if isinstance(error, FailureException):
+        if (isinstance(error, FailureException) and
+                error.reporter.root is not self.root):
             # Unwrap labeled failures
             source = _join(source, error.source)
             details = {**details, **error.details}
@@ -176,75 +177,7 @@ class Reporter:
         :param details: Any additional details to be reported with the failure
         :returns: None
         """
-        self.failures.append(self._prepare(error, details))
-
-    def propagate(self, error: Exception, **details) -> None:
-        """
-        Raises the failure with reporter's label prepended
-
-        :param error: Regular Exception or FailureException
-        :param details: Any additional details to be reported with the failure
-        :returns: None
-        """
-        raise FailureException(self._prepare(error, details), self)
-
-    def optional(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        """
-        Calls the func(*args, **kwargs) and returns the result
-        in case of success, or returns None ignoring all failures otherwise.
-
-        :param func: The function to be called in a safe context
-        :param args: Any positional arguments expected by func
-        :param kwargs: Any keyword arguments expected by func
-        :returns: The returned value of func or None if it fails
-        """
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            return
-
-    async def optional_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        """
-        Calls the await func(*args, **kwargs) and returns the result
-        in case of success, or returns None ignoring all failures otherwise.
-
-        :param func: The function to be called in a safe context
-        :param args: Any positional arguments expected by func
-        :param kwargs: Any keyword arguments expected by func
-        :returns: The returned value of func or None if it fails
-        """
-        try:
-            return await func(*args, **kwargs)
-        except Exception:
-            return
-
-    def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        """
-        Calls the function in a safe context and reports the failure if it occurs
-
-        :param func: The function to be called in a safe context
-        :param args: Any positional arguments expected by func
-        :param kwargs: Any keyword arguments expected by func
-        :returns: The returned value of func or None if it fails
-        """
-        try:
-            return func(*args, **kwargs)
-        except Exception as err:
-            self.report(err)
-
-    async def safe_async(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
-        """
-        Calls the coroutine function in a safe context and reports the failure if it occurs
-
-        :param func: The function to be called in a safe context
-        :param args: Any positional arguments expected by func
-        :param kwargs: Any keyword arguments expected by func
-        :returns: The returned value of func or None if it fails
-        """
-        try:
-            return await func(*args, **kwargs)
-        except Exception as err:
-            self.report(err)
+        self.failures.append(self.failure(error, **details))
 
     def __enter__(self) -> Self:
         return self
@@ -258,7 +191,7 @@ class Reporter:
         if error is None:
             return True
         elif isinstance(error, Exception):
-            raise FailureException(self._prepare(error), self)
+            raise FailureException(self.failure(error), self)
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
         # Or module validation errors that must be raised
         return False
@@ -340,11 +273,14 @@ def optional(func: Callable[P, T], /) -> Callable[P, Optional[T]]:
             return func(*args, **kwargs)
         except Exception:
             return
+
     return wrapper
 
 
 @overload
 def scoped(function: FunctionVar, /) -> FunctionVar: ...
+
+
 @overload
 def scoped(*, name: str = ...) -> Callable[[FunctionVar], FunctionVar]: ...
 
@@ -355,6 +291,7 @@ def scoped(function: FunctionVar = None, /, *, name: str = None):
     by default, the label will be the function's name, but
     it could be overridden with a custom label
     """
+
     def decorator(func: FunctionVar, /) -> FunctionVar:
         """Ready to used 'failures.scoped' decorator"""
         if not callable(func):
@@ -371,7 +308,7 @@ def scoped(function: FunctionVar = None, /, *, name: str = None):
                 _args = list(args)
                 _args[idx] = rep
                 return _args
-            idx = spec.args.index(rep_name)
+
             if is_async:
                 async def wrapper(*args, **kwargs):
                     with scope(name_, args[idx]) as rep:
@@ -403,4 +340,5 @@ def scoped(function: FunctionVar = None, /, *, name: str = None):
                         return func(*args, **kwargs)
         wrapper.__signature__ = inspect.signature(func)
         return functools.update_wrapper(wrapper, func)
+
     return decorator if function is None else decorator(function)
