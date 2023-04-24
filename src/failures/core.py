@@ -13,8 +13,7 @@ from typing import (Optional, Type, List, Dict, Any, overload, Callable,
 if sys.version_info.minor >= 10:
     from typing import ParamSpec, TypeAlias
 else:
-    from typing_extensions import ParamSpec, TypeAlias
-
+    from typing_extensions import ParamSpec, TypeAlias, Self
 
 # Type Aliases
 T = TypeVar('T')
@@ -53,21 +52,24 @@ class Failure(NamedTuple):
 
 class FailureException(Exception):
     """Wraps error to keep track of labeled sources"""
-    source: str
-    error: Exception
-    reporter: Optional['Reporter']
-    details: Dict[str, Any]
+    failure: Failure
+    reporter: 'Reporter'
 
-    def __init__(self, source: str, error: Exception, reporter: 'Reporter' = None, **details):
-        self.source = source
-        self.error = error
+    def __init__(self, failure: Failure, reporter: 'Reporter') -> None:
+        self.failure = failure
         self.reporter = reporter
-        self.details = details
 
     @property
-    def failure(self) -> Failure:
-        """Gets the failure information"""
-        return Failure(self.source, self.error, self.details, REQUIRED)
+    def source(self) -> str:
+        return self.failure.source
+
+    @property
+    def error(self) -> Exception:
+        return self.failure.error
+
+    @property
+    def details(self) -> Dict[str, Any]:
+        return self.failure.details
 
 
 def _join(label1: str, label2: str) -> str:
@@ -103,10 +105,9 @@ class Reporter:
     __name: str
     __failures: List[Failure]
 
-    def __init__(self, name: str, /, severity: Severity = NORMAL) -> None:
+    def __init__(self, name: str, /) -> None:
         """
         :param name: The label for the current reporter (mandatory)
-        :param severity: Specifies the operation type: OPTIONAL, NORMAL (default) or REQUIRED
         """
         if __debug__:
             # Validation is only evaluated when run without the -O or -OO python flag
@@ -114,26 +115,22 @@ class Reporter:
                 raise _invalid(TypeError, "label must be a string")
             elif not NamePattern.match(name):
                 raise _invalid(ValueError, f"invalid label: {name!r}")
-            if not isinstance(severity, Severity):
-                raise TypeError("'severity' can either be OPTIONAL, NORMAL or REQUIRED")
         self.__name = name
-        self.__severity = severity
 
-    def __call__(self, name: str, /, severity: Severity = NORMAL) -> 'Reporter':
+    def __call__(self, name: str, /) -> 'ReporterChild':
         """
         Creates a reporter child bound to the current one.
 
         :param name: The label for the current reporter (mandatory)
-        :param severity: Specifies the operation type: OPTIONAL, NORMAL (default) or REQUIRED
         :returns: New reporter object
         """
-        return ReporterChild(name, severity, self)
+        return ReporterChild(name, self)
 
     def __repr__(self) -> str:
-        return f'Reporter({self.label!r}, {self.severity.name})'
+        return f'Reporter({self.label!r})'
 
     @property
-    def parent(self) -> Optional['Reporter']:
+    def parent(self) -> None:
         """Gets nothing as this reporter has no parent"""
         return
 
@@ -161,33 +158,65 @@ class Reporter:
             self.__failures = []
             return self.__failures
 
-    @property
-    def severity(self) -> Severity:
-        """Gets the severity level of the current reporter."""
-        return self.__severity
-
-    def report(self, error: Exception, **details) -> None:
-        """
-        The reporter treats the failure depending on the severity flag.
-
-        :param error: A regular exception or a pre-labeled failure
-        :param details: Any additional details to be reported with the failure
-        :returns: None
-        """
+    def _prepare(self, error: Exception, details: Dict[str, Any]) -> Failure:
+        """Creates a failure from error, details and reporter's information"""
         source = self.label
-        severity = self.severity
-        if severity is OPTIONAL:
-            # Ignores the failure
-            return
         if isinstance(error, FailureException):
             # Unwrap labeled failures
             source = _join(source, error.source)
             details = {**details, **error.details}
             error = error.error
-        if severity is REQUIRED:
-            # Raises the failure as exception
-            raise FailureException(source, error, self, **details)
-        self.failures.append(Failure(source, error, details))
+        return Failure(source, error, details)
+
+    def report(self, error: Exception, **details) -> None:
+        """
+        Registers the failure into the shared failures list
+
+        :param error: Regular Exception or FailureException
+        :param details: Any additional details to be reported with the failure
+        :returns: None
+        """
+        self.failures.append(self._prepare(error, details))
+
+    def propagate(self, error: Exception, **details) -> None:
+        """
+        Raises the failure with reporter's label prepended
+
+        :param error: Regular Exception or FailureException
+        :param details: Any additional details to be reported with the failure
+        :returns: None
+        """
+        raise FailureException(self._prepare(error, details), self)
+
+    def optional(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls the func(*args, **kwargs) and returns the result
+        in case of success, or returns None ignoring all failures otherwise.
+
+        :param func: The function to be called in a safe context
+        :param args: Any positional arguments expected by func
+        :param kwargs: Any keyword arguments expected by func
+        :returns: The returned value of func or None if it fails
+        """
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            return
+
+    async def optional_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        """
+        Calls the await func(*args, **kwargs) and returns the result
+        in case of success, or returns None ignoring all failures otherwise.
+
+        :param func: The function to be called in a safe context
+        :param args: Any positional arguments expected by func
+        :param kwargs: Any keyword arguments expected by func
+        :returns: The returned value of func or None if it fails
+        """
+        try:
+            return await func(*args, **kwargs)
+        except Exception:
+            return
 
     def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
@@ -203,11 +232,11 @@ class Reporter:
         except Exception as err:
             self.report(err)
 
-    async def safe_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+    async def safe_async(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
         Calls the coroutine function in a safe context and reports the failure if it occurs
 
-        :param func: The coroutine function to be called in a safe context
+        :param func: The function to be called in a safe context
         :param args: Any positional arguments expected by func
         :param kwargs: Any keyword arguments expected by func
         :returns: The returned value of func or None if it fails
@@ -217,16 +246,33 @@ class Reporter:
         except Exception as err:
             self.report(err)
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+            self,
+            _err_type: Type[BaseException] = None,
+            error: BaseException = None,
+            _err_tb: TracebackType = None
+    ) -> bool:
+        if error is None:
+            return True
+        elif isinstance(error, Exception):
+            raise FailureException(self._prepare(error), self)
+        # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
+        # Or module validation errors that must be raised
+        return False
+
 
 class ReporterChild(Reporter):
     __slots__ = ('__parent',)
     __parent: Reporter
 
-    def __init__(self, name: str, /, severity: Severity, parent: Reporter) -> None:
+    def __init__(self, name: str, /, parent: Reporter) -> None:
         if __debug__:
             if not isinstance(parent, Reporter):
                 raise TypeError("'parent' must be instance of Reporter")
-        Reporter.__init__(self, name, severity)
+        Reporter.__init__(self, name)
         self.__parent = parent
 
     @property
@@ -286,6 +332,15 @@ class scope:
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
         # Or module validation errors that must be raised
         return False
+
+
+def optional(func: Callable[P, T], /) -> Callable[P, Optional[T]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            return
+    return wrapper
 
 
 @overload
