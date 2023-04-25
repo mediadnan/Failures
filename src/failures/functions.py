@@ -1,6 +1,6 @@
-import functools
 import types
 import inspect
+import functools
 from typing import Callable, Any, Optional, Union, Dict, Tuple, overload
 
 from typing_extensions import get_origin, get_args
@@ -25,8 +25,7 @@ def _is_param_reporter(name: str, annotation: Any) -> bool:
     return _reporter_hint or (name == 'reporter' and _no_annotation)
 
 
-def detect_signature_reporter(func: FunctionVar, /) -> Tuple[
-    FunctionVar,
+def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
     Callable[[tuple, Dict[str, Any]], Optional[Reporter]],
     Callable[[tuple, Dict[str, Any], Reporter], Tuple[tuple, Dict[str, Any]]],
 ]:
@@ -42,7 +41,7 @@ def detect_signature_reporter(func: FunctionVar, /) -> Tuple[
             _args = list(args)
             _args[idx] = reporter
             return tuple(_args), kwargs
-        return func, _get, _set
+        return _get, _set
     for _arg in spec.kwonlyargs:
         if not _is_param_reporter(_arg, spec.annotations.get(_arg, NOTSET)):
             continue
@@ -53,8 +52,8 @@ def detect_signature_reporter(func: FunctionVar, /) -> Tuple[
         def _set(args: tuple, kwargs: Dict[str, Any], reporter: Reporter) -> Tuple[tuple, Dict[str, Any]]:
             kwargs[_arg] = reporter
             return args, kwargs
-        return func, _get, _set
-    return func, lambda a, k: None, lambda a, k, r: (a, k)
+        return _get, _set
+    return lambda _a, _k: None, lambda a, k, _: (a, k)
 
 
 def is_async(func: FunctionVar, /) -> bool:
@@ -78,7 +77,7 @@ def scoped(func: FunctionVar, /) -> FunctionVar: ...
 def scoped(name: str = ..., /) -> Callable[[FunctionVar], FunctionVar]: ...
 
 
-def scoped(arg: Union[FunctionVar, str, None] = None, /) -> Union[FunctionVar, Callable[[FunctionVar], FunctionVar]]:
+def scoped(arg=None, /):
     """
     Decorates functions to intercept any inner failures and add
     the function name to its label, and also add the function's
@@ -87,19 +86,17 @@ def scoped(arg: Union[FunctionVar, str, None] = None, /) -> Union[FunctionVar, C
     This decorator can be either parametrized or not.
 
     >>> @scoped
-    ... def function(*args, **kwars):
+    ... def function(*args, **kwargs):
     ...     pass
 
     or
 
     >>> @scoped('my_function')
-    ... def function(*args, **kwars):
+    ... def function(*args, **kwargs):
     ...     pass
     """
     def decorator(func_: FunctionVar, /, name: str = None) -> FunctionVar:
-        if not callable(func_):
-            raise TypeError("@scoped decorator expects a function")
-        func_, _get, _set = detect_signature_reporter(func_)
+        _get, _set = _get_set_reporter_from_signature(func_)
         name_ = name or get_func_name(func_)
         if is_async(func_):
             async def wrap(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:

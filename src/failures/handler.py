@@ -1,9 +1,8 @@
-"""failures.handler module implements the failure handling tools"""
 import re
 import abc
-from typing import Pattern, List, Literal, Generator
+from typing import Pattern, List, Literal, Callable, Type, Tuple, Union
 from datetime import datetime
-from contextlib import contextmanager
+
 try:
     import colorama
 except ImportError:
@@ -19,9 +18,16 @@ else:
         f"{colorama.Style.BRIGHT + colorama.Fore.LIGHTRED_EX}){colorama.Style.RESET_ALL} "
         f"{colorama.Style.DIM + colorama.Fore.CYAN}{{time}}{colorama.Fore.RESET}{colorama.Style.RESET_ALL}"
     )
+from typing_extensions import TypeAlias
 
-from .core import (Failure, FailureHandler, FailureException, Filters,
-                   SupportedFilters, FailureFilter, ExceptionTypes)
+from .core import Failure, FailureException, Reporter
+
+# Type aliases
+FailureFilter: TypeAlias = Callable[['Failure'], bool]
+FailureHandler: TypeAlias = Callable[['Failure'], None]
+ExceptionTypes = Union[Type[Exception], Tuple[Type[Exception], ...]]
+SupportedFilters: TypeAlias = Union[str, Pattern[str], ExceptionTypes]
+Filters: TypeAlias = Union[SupportedFilters, Tuple[SupportedFilters, ...]]
 
 
 def print_failure(failure: Failure, /) -> None:
@@ -121,7 +127,8 @@ def filtered(handler: FailureHandler, *filters: Filters) -> FailureHandler:
         filters_.append(_make_filter(filter_))
     _len = len(filters_)
     if _len > 1:
-        condition = lambda f: any((flt(f) for flt in filters_))
+        def condition(f: Failure) -> bool:
+            return any((flt(f) for flt in filters_))
     elif _len == 1:
         condition = filters_[0]
     else:
@@ -146,11 +153,62 @@ def combine(handler: FailureHandler, *handlers: FailureHandler) -> FailureHandle
     return _handle
 
 
-@contextmanager
-def handle(handler: FailureHandler = print_failure) -> Generator[None, None, None]:
-    """Context manager that captures and handles failures"""
-    try:
-        yield
-    except FailureException as err:
-        for failure in (err.failure, *err.reporter.failures):
-            handler(failure)
+class Handler:
+    """
+    Handler object combines multiple filtered or unfiltered failure handlers
+    together as a single failure handler, allowing the creation of complex
+    failure handlers.
+
+    The handler is also a context manager, used with ``with`` statement,
+    it captures and automatically handles any raised FailureException.
+    """
+    __slots__ = '__handler',
+    __handler: FailureHandler
+
+    def __init__(self, *args: Union[FailureHandler, Tuple[FailureHandler, Filters, ...]]):
+        """
+        The handler constructor optionally takes one or multiple failure handing functions
+        (with signature (Failure)->None), the handlers also can be filtered to handle only
+        a targeted group of failures.
+
+        To pass a filtered handler, put it inside a tuple followed with one or multiple filter
+        like (func, filter1, filter2, ...), so func will be called only if the failure matches
+        any of filter1, filter2, ...
+
+        Filtered handlers can also be more specific by combining filters like (func, (f1, f2), f3, (f4, f5, f6)),
+        so func will only handle failures that match the filters: (f1 AND f2) OR f3 OR (f4 AND f5 AND f6)
+
+        :param args: A sequence of either func, (func, filter, filter, ...) or (func, (filter, filter), (...), ...)
+        """
+        _handlers = [filtered(*arg) if isinstance(arg, tuple) else arg for arg in args]
+        if not _handlers:
+            self.__handler = print_failure
+        elif len(_handlers) == 1:
+            self.__handler = _handlers[0]
+        else:
+            self.__handler = combine(*_handlers)
+
+    def __call__(self, failure: Failure, /) -> None:
+        """Handles the failure by calling the internal handler"""
+        self.__handler(failure)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None) -> bool:
+        if exc_type is None:
+            return True
+        elif issubclass(exc_type, FailureException):
+            self(exc_val)
+            return True
+        return False
+
+    def from_reporter(self, reporter: Reporter) -> None:
+        """
+        Handles every failure registered by the reporter.
+
+        :param reporter: Reporter that holds failures
+        :return: None
+        """
+        for failure in reporter.failures:
+            self.__handler(failure)

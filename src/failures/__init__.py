@@ -1,7 +1,7 @@
 """This library provides tools to label and handle errors anywhere in your code easily"""
 from .core import Reporter, Failure, FailureException
-from .handler import handle, filtered, combine, print_failure
 from .functions import scoped
+from .handler import Handler, filtered, combine, print_failure
 
 # -------------------------------- WARNING! -------------------------------- #
 #                                                                            #
