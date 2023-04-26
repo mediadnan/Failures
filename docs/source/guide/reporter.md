@@ -36,10 +36,11 @@ We can add details to both reporter and error, the failure will merge both detai
 >>> from failures import Reporter
 >>> reporter = Reporter('my_label', environment='production', another='info')
 >>> reporter.report(ValueError("this is a value error"), input=25.0)
->>> reporter.report(TypeError("this is a type error"), input=None, another='overriden')
->>> reporter.report(KeyError("this is a key error"))
+... reporter.report(TypeError("this is a type error"), input=None, another='overriden')
+... reporter.report(KeyError("this is a key error"))
 >>> for failure in reporter.failures:
 ...   print(failure)
+...
 Failure(source='my_label', error=ValueError('this is a value error'), details={'environment': 'production', 'another': 'info', 'input': 25.0})
 Failure(source='my_label', error=TypeError('this is a type error'), details={'environment': 'production', 'another': 'overriden', 'input': None})
 Failure(source='my_label', error=KeyError('this is a key error'), details={'environment': 'production', 'another': 'info'})
@@ -73,9 +74,8 @@ characters, like ``Iteration[64]``, ``branch[main]`` or ``Inbox(new)``.
 This validation mechanism helps to ensure a good labeling quality, as this is a main features of this library.
 
 ## Sub reporters
-We can derive new reporters from an existing one the same way we create one,
+We can derive new reporters from an existing one the same way we create a one by ``Reporter(...)``,
 this is achieved by calling the reporter itself with a new name like this
-
 ```pycon
 >>> from failures import Reporter
 >>> reporter = Reporter('main')
@@ -88,133 +88,262 @@ Reporter('main.sub.sub')
 >>> sub_sub('another')
 Reporter('main.sub.sub.another')
 ```
-
-We can keep deriving sub reporters as much as we need, like:
+The label of new derived reporters contains the label of their parent, this behavior allows us to track the context
+when we pass reporters as arguments like this.
 
 ````pycon
->>> sub_sub = sub_reporter('sub')
->>> sub_sub
-Reporter('main.sub.sub', NORMAL)
->>> sub_sub('sub_again')
-Reporter('main.sub.sub.sub_again', NORMAL)
+>>> from failures import Reporter
+>>> class ClientResponseError(Exception): ...
+...
+>>> class JSONDecodeError(Exception): ...
+...
+>>> rep = Reporter('product', id='488sd1c7a', store='home_and_garden_store')
+>>> rep_download = rep('download', method='GET', endpoint='https://home_and_garden_store.example.com/api/products')
+>>> rep_parse = rep('parse', parser='orjson.loads')
+>>> rep_download.report(ClientResponseError(404, "Product not found"))
+>>> rep_parse.report(JSONDecodeError("Invalid json string"))
+>>> for failure in rep.failures:
+...     print(failure)
+...
+Failure(source='product.download', error=ClientResponseError(404, 'Product not found'), details={'id': '488sd1c7a', 'store': 'home_and_garden_store', 'method': 'GET', 'endpoint': 'https://home_and_garden_store.example.com/api/products'})
+Failure(source='product.parse', error=JSONDecodeError('Invalid json string'), details={'id': '488sd1c7a', 'store': 'home_and_garden_store', 'parser': 'orjson.loads'})
 ````
-And this will help us when passing reporters to functions as arguments,
-as they keep track of their origin. Making them the perfect tool to pinpoint
-the source of the failure.
+As shown in this example, both sub-reporters include context details from their common ancestor ``details={'id': ..., 'store': ...}``
+and both are labeled with ``product.(...)``.
 
-Now let's explore some common reporter properties and compare them
+In fact, all reporters are nodes that keep an actual reference to their ancestor. We can demonstrate this by 
+the following example:
 
 ```pycon
->>> # reporter's label
->>> reporter.label
-'main'
->>> sub_reporter.label
-'main.sub'
->>> sub_sub.label
-'main.sub.sub'
->>> # reporter's parent
->>> reporter.parent  # None
+>>> from failures import Reporter
+...
+>>> # Creating a reporter tree
+... user_rep = Reporter('user')
+... user_download = user_rep('download', method='POST')
+... user_parse = user_rep('parse', type='XML')
+... parse_email = user_parse('email')
+... parse_phone = user_parse('phone', country='MA')
+... 
+>>> # Comparing labels
+>>> user_rep.label
+'user'
+>>> user_download.label
+'user.download'
+>>> user_parse.label
+'user.parse'
+>>> parse_email.label
+'user.parse.email'
+>>> parse_phone.label
+'user.parse.phone'
+>>>
+>>> # Comparing names (labels without parents)
+>>> user_rep.name
+'user'
+>>> user_download.label
+'download'
+>>> user_parse.label
+'parse'
+>>> parse_email.label
+'email'
+>>> parse_phone.label
+'phone'
+>>>
+>>> # Comparing details
+>>> user_rep.details
+{}
+>>> user_download.details
+{'method': 'POST'}
+>>> user_parse.details
+{'type': 'XML'}
+>>> parse_email.details
+{'type': 'XML'}
+>>> parse_phone.details
+{'type': 'XML', 'country': 'MA'}
+>>>
+>>> # Comparing reporter parent
+>>> user_rep.parent  # None
 
->>> sub_reporter.parent
-Reporter('main', NORMAL)
->>> sub_sub.parent
-Reporter('main.sub', NORMAL)
->>> # reporter's root
->>> reporter.root  # self
-Reporter('main', NORMAL)
->>> sub_reporter.root
-Reporter('main', NORMAL)
->>> sub_sub.root
-Reporter('main', NORMAL)
->>> # reporter's name
->>> reporter.name
-'main'
->>> sub_reporter.name
-'sub'
->>> sub_sub.name
-'sub'
+>>> user_download.parent
+Reporter('user')
+>>> user_parse.parent
+Reporter('user')
+>>> parse_email.parent
+Reporter('user.parse')
+>>> parse_phone.parent
+Reporter('user.parse')
+>>>
+>>> # Comparing reporter tree root
+>>> user_rep.root  # it is the root, returns self
+Reporter('user')
+>>> user_download.root
+Reporter('user')
+>>> user_parse.root
+Reporter('user')
+>>> parse_email.root
+Reporter('user')
+```
+In case the example wasn't clear, here's an explanation about the compared attributes:
+
++ ``label`` is a read-only property that gets the hierarchical tree labels, used in reports to pinpoint its exact
+  logical location that we explicitly labeled.
++ ``name`` is a read-only property that gets only the reporter's label as a unit.
++ ``details`` is a read-only property that gets the accumulated context details that where passed to the constructors.
++ ``parent`` is a read-only property that gets the reporter which created the current one,
+  root reporters return ``None``
++ ``root`` is a read-only property that gets the first reporter in the current tree, the first ancestor.
+
+One thing to note here is that all reporters from the same tree are bound to their roots, in fact, they all share
+the same failures list which can be accessed via any of them.
+
+````pycon
+>>> import failures
+>>> # Creating reporter tree
+>>> rep = failures.Reporter("main")
+... sub = rep("sub")
+... sub_sub = sub("sub_sub")
+>>> # Reporting failures
+>>> rep.report(TypeError("'NoneType' object is not subscriptable"))
+... sub.report(TypeError("unsupported operand type(s) for /: 'NoneType' and 'int'"))
+... sub_sub.report(TypeError("'NoneType' object is not callable"))
+>>> # Accessing failures
+>>> for failure in rep.failures:
+...     print(failure)
+... 
+Failure(source='main', error=TypeError("'NoneType' object is not subscriptable"), details={})
+Failure(source='main.sub', error=TypeError("unsupported operand type(s) for /: 'NoneType' and 'int'"), details={})
+Failure(source='main.sub.sub_sub', error=TypeError("'NoneType' object is not callable"), details={})
+>>> for failure in sub_sub.failures:
+...     print(failure)
+...
+Failure(source='main', error=TypeError("'NoneType' object is not subscriptable"), details={})
+Failure(source='main.sub', error=TypeError("unsupported operand type(s) for /: 'NoneType' and 'int'"), details={})
+Failure(source='main.sub.sub_sub', error=TypeError("'NoneType' object is not callable"), details={})
+>>> # The same list
+>>> rep.failures is sub.failures
+True
+>>> rep.failures is sub_sub.failures
+True
+````
+
+## Labeled scopes
+The reporter is often used to report failures, and by reporting I mean keeping failures until the called function 
+returns, and we explicitly decide to handle registered failures.
+
+Consider a simple example, a function that takes a number, either ``str``, ``int`` or ``float`` and evaluates the square
+root of its inverse, and just for demonstration purpose, we will split it into two functions.
+
+```{code-block} python
+  :caption: invsqrt.py
+
+from math import sqrt
+from failures import Reporter
+
+
+def inverse_sqrt(num: str | int | float, reporter: Reporter = None) -> float | None:
+    reporter = (reporter or Reporter)('inverse_sqrt')
+    try:
+        # [1] Fails for an invalid number
+        number = float(num)
+    except (ValueError, TypeError) as error:
+        reporter('converting').report(error)
+        return
+    return _inv_sqrt(number, reporter)
+
+
+def _inv_sqrt(num: float, reporter: Reporter) -> float | None:
+    try:
+        # [2] Fails if num == 0
+        num = 1 / num
+    except ZeroDivisionError as error:
+        reporter('inverting').report(error)
+        return
+    try:
+        # [3] Fails if num < 0
+        num = sqrt(num)
+    except ValueError as error:
+        reporter('square_root').report(error)
+    else:
+        return round(num, 2)
 ```
 
-As shown in this example, the ``label`` property gets the full combined tree names of the reporter, 
-the ``name`` property only gets the current reporter's name, the ``parent`` property returns
-the reporter's parent if there is one and the ``root`` property returns the first reporter
-of the tree.
+The main function ``inverse_sqrt`` expects a valid number that can be converted to a ``float``, it doesn't require
+a reporter, so we called ``(reporter or Reporter)('inverse_sqrt')``, this basically means call
+``reporter('inverse_sqrt')`` if there is one or call ``Reporter('inverse_sqrt')`` otherwise.
+This reporter will be the scope reporter for the next operations, then we pass it to the helper function ``_inv_sqrt``.
 
-The main reason reporters are made is to report failures; we can report from any of the three reporters
-
-````pycon
->>> reporter.report(TypeError('test type error'))
->>> sub_reporter.report(Exception('test generic error'))
->>> sub_sub.report(TabError('test error error'))
->>> for failure in reporter.failures:
-...     print(failure)
-Failure(source='main', error=TypeError('test type error'), details={}, severity=<Severity.NORMAL: 1>)
-Failure(source='main.sub', error=Exception('test generic error'), details={}, severity=<Severity.NORMAL: 1>)
-Failure(source='main.sub.sub', error=TabError('test error error'), details={}, severity=<Severity.NORMAL: 1>)
-````
-
-All failures will be inserted to the same shared list.
+Now let's test our function in the interpreter:
 
 ````pycon
->>> reporter.failures is sub_reporter.failures
-True
->>> reporter.failures is sub_sub.failures
-True
+>>> from failures import Reporter
+>>> from invsqrt import inverse_sqrt
+>>> # Good cases
+>>> inverse_sqrt(.25)  # float / without reporter
+2.0
+>>> rep = Reporter('main')
+>>> inverse_sqrt(4, rep)  # int / with reporter
+0.5
+>>> rep.failures
+[]
+>>> inverse_sqrt("0.94", rep)  # str / with reporter
+1.03
+>>> rep.failures
+[]
+>>> # Bad cases
+>>> rep = Reporter('main')
+>>> inverse_sqrt(None, rep)  # None
+
+>>> rep.failures.pop()
+Failure(source='main.inverse_sqrt.converting', error=TypeError("float() argument must be a string or a real number, not 'NoneType'"), details={})
+>>> inverse_sqrt('four', rep)  # None
+
+>>> rep.failures.pop()
+Failure(source='main.inverse_sqrt.converting', error=ValueError("could not convert string to float: 'four'"), details={})
+>>> inverse_sqrt('0', rep)  # None
+
+>>> rep.failures.pop()
+Failure(source='main.inverse_sqrt.inverting', error=ZeroDivisionError('float division by zero'), details={})
+>>> inverse_sqrt('-0.25', rep)  # None
+
+>>> rep.failures.pop()
+Failure(source='main.inverse_sqrt.square_root', error=ValueError('math domain error'), details={})
+````
+In that specific case, the reporter is not really needed as all steps are mandatory.
+In cases like this one, we really want to fail to skip the remaining code and only handle the failure outside, even
+returning ``None`` in this case can become buggy if the calling function expects an actual ``float``.
+
+A better alternative in this case is to use ``Reporter`` as a failure context instead of using it as a failure reporter,
+this can be achieved by using the ``with`` statement to label each part of code.
+
+The previous code can be refactored to this
+
+````python
+from math import sqrt
+from failures import Reporter
+
+
+def inverse_sqrt(num: str | int | float) -> float:
+    with Reporter('inverse_sqrt') as reporter:
+        with reporter('converting'):
+            # [1] Fails for an invalid number
+            number = float(num)
+        return _inv_sqrt(number, reporter)
+
+
+def _inv_sqrt(num: float) -> float:
+    with Reporter('inverting'):
+        # [2] Fails if num == 0
+        num = 1 / num
+    with Reporter('square_root'):
+        # [3] Fails if num < 0
+        num = sqrt(num)
+    return round(num, 2)
 ````
 
-## Operation severities
-The reporter has three different states, ``REQUIRED``, ``NORMAL`` or ``OPTIONAL``, as shown in previous examples,
-the default state is ``NORMAL``.
+TODO ...
 
-Sometimes a failure is quite expected, like trying to access an optional key from a dictionary that could be missing,
-as this failure is often happening, reporters with ``NORMAL`` flag will annoyingly report it every time it happens.
-If we want to ignore that specific failure, we can mark that specific reporter as ``OPTIONAL``.
-
-We can override the default severity flag by passing the new one as second argument.
-
-````pycon
->>> from failures import Reporter, OPTIONAL, NORMAL, REQUIRED
->>> reporter = Reporter('main', OPTIONAL)  # default is NORMAL for the first one
->>> reporter
-Reporter('main', OPTIONAL)
->>> reporter.severity
-<Severity.OPTIONAL: 0>
->>> sub = reporter('sub', OPTIONAL)  # default is NORMAL
->>> sub
-Reporter('main.sub', OPTIONAL)
->>> sub.severity
-<Severity.OPTIONAL: 0>
->>> sub_sub = sub('sub')  # keeping the default
->>> sub_sub
-Reporter('main.sub.sub', NORMAL)
->>> # reporting from each one
->>> reporter.report(Exception("test failure 1"))
->>> sub.report(Exception("test failure 2"))
->>> sub_sub.report(Exception("test failure 3"))
->>> for failure in reporter.failures:
-...     print(failure)
-Failure(source='main.sub.sub', error=Exception('test failure 3'), details={}, severity=<Severity.NORMAL: 1>)
-````
-However, some operations can be a dependency for the next ones, as important as they are, we want 
-to skip the rest of operations and raise an error informing the caller that the whole operation has failed.
-To achieve this, we can mark the reporter of that specific operation as ``REQUIRED``
-
-````pycon
->>> reporter = Reporter('main', REQUIRED)
->>> reporter.report(Exception("testing"))
-Traceback (most recent call last):
-    ...
-failures.core.FailureException: ('main', Exception('testing'), Reporter('main', REQUIRED))
->>> sub = reporter('sub', REQUIRED)
->>> sub.report(ValueError('testing'))
-Traceback (most recent call last):
-    ...
-failures.core.FailureException: ('main.sub', ValueError('testing'), Reporter('main.sub', REQUIRED))
-````
-
-That failure exception was intentionally raised, to stop any remaining code and to be captured by the outermost
-calling layer. 
-We will discuss how to handle that in a later section.
+\
+\
+To refactor 
 
 ## Safe context
 When we find ourselves working multiple inline operations, trying to manually wrap each one in ```try...except``` blocks
