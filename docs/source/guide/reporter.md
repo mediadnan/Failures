@@ -307,9 +307,10 @@ Failure(source='main.inverse_sqrt.inverting', error=ZeroDivisionError('float div
 >>> rep.failures.pop()
 Failure(source='main.inverse_sqrt.square_root', error=ValueError('math domain error'), details={})
 ````
-In that specific case, the reporter is not really needed as all steps are mandatory.
-In cases like this one, we really want to fail to skip the remaining code and only handle the failure outside, even
-returning ``None`` in this case can become buggy if the calling function expects an actual ``float``.
+In that specific case, the reporter was misused as all steps are mandatory and dependent.
+In cases like this one, we really want the function to fail and skip the remaining code,
+and only handle the that failure outside. 
+Returning ``None`` in this case can become buggy if the calling function expects an actual ``float``.
 
 A better alternative in this case is to use ``Reporter`` as a failure context instead of using it as a failure reporter,
 this can be achieved by using the ``with`` statement to label each part of code.
@@ -326,7 +327,7 @@ def inverse_sqrt(num: str | int | float) -> float:
         with reporter('converting'):
             # [1] Fails for an invalid number
             number = float(num)
-        return _inv_sqrt(number, reporter)
+        return _inv_sqrt(number)
 
 
 def _inv_sqrt(num: float) -> float:
@@ -339,47 +340,147 @@ def _inv_sqrt(num: float) -> float:
     return round(num, 2)
 ````
 
+This already looks shorter and more readable.
+All operations are scoped under specific labels, so if a failure occurs in any step,
+that failure will be labeled and re-raised with context details, so the caller function needs to expect a failure.
+
+Note here that we didn't explicitly return ``None`` when a failure occurs, nor that we needed to wrap every step in
+``try/except`` blocks. 
+The reporter under ``with`` statement will automatically catch and add metadata to each failure
+then re-raise it to the outer layer reporter's scope or handler.
+
+Note also that we don't need to pass the reporter between functions as argument, the failure metadata passed via 
+the exception.
+
+One more thing to point out here, is that ``with Reporter('inverse_sqrt') as reporter`` returns
+the ``Reporter('inverse_sqrt')`` itself, and in this specific case the reporter is not really neaded as nothing will 
+be reported.
+
+So in this context, this:
+```python
+...
+with Reporter('inverse_sqrt') as reporter:
+    with reporter('converting'):
+        ...
+```
+Will have the same effect as this:
+```python
+...
+with Reporter('inverse_sqrt'):
+    with Reporter('converting'):
+        ...
+```
+Those reporters don't need to be bound.
+
+Now, let's test this new code:
+
+````pycon
+>>> inverse_sqrt('.25')
+2.0
+>>> try:
+...     inverse_sqrt('four')
+... except Exception as exc:
+...     print(exc.failure)
+...
+Failure(source='inverse_sqrt.converting', error=ValueError("could not convert string to float: 'four'"), details={})
+>>> try:
+...     inverse_sqrt(0)
+... except Exception as exc:
+...     print(exc.failure)
+...     
+Failure(source='inverse_sqrt.inverting', error=ZeroDivisionError('float division by zero'), details={})
+... try:
+...     inverse_sqrt(-0.0001)
+... except Exception as exc:
+...     print(exc.failure)
+...
+Failure(source='inverse_sqrt.square_root', error=ValueError('math domain error'), details={})
+````
+We don't need to handle raised exceptions using ``try/except`` blocks, in the next chapter we will discuss how to handle
+them using ``failures.Handler``.
+
+\
+\
 TODO ...
 
-\
-\
-To refactor 
+## Execution context
+When we find ourselves working with multiple inline operations, wrapping each line in ```try/except``` blocks
+to capture and report failures can become tedious and ugly, let's take a look at an example:
 
-## Safe context
-When we find ourselves working multiple inline operations, trying to manually wrap each one in ```try...except``` blocks
-then capture and report each failure can be tedious.
+````python
+from failures import Reporter
+
+
+def get_user_info(user_id: int, raw_data: dict, reporter: Reporter = None) -> tuple[int, str | None, str | None]:
+  """Extracts username and email of the user with 'user_id' from 'raw_data'"""
+  reporter = (reporter or Reporter)('users')
+  with reporter('get_user_by_id'):
+    user = raw_data['users'][user_id]
+  try:
+    name = user['name']
+  except KeyError:
+    name = None
+  try:
+    email = user['email']
+  except KeyError as error:
+    reporter('email').report(error)
+    email = None
+  return user_id, name, email
+````
+The above example is straight forward, the function ``get_user_info`` tries to get the user by id from a dictionary of 
+users, then it tries to get its name and email and returns the result.
+
+Both operations ``user['name']`` and ``user['email']`` are not critical as ``raw_data['users'][user_id]``,
+as the last mentioned operation is required by the two others, and the function should fail for a non-existing
+id, but failing to find the username is completely ignored and replaced by ``None`` directly, and failing to
+get the email is first reported then replaced by ``None``.
+
+We can categorize those three operations as **optional** _(like ``user['name']``)_,
+**monitored** _(like ``user['email']``)_
+and **required** _(like ``raw_data['users'][user_id]``)_.
+
+However, this code is more verbose than it needs to be, and this won't be optimal if we have multiple operations.
+
+To tackle this issue, the reporter comes with methods to execute functions inside a handled environment,
+those methods are shorthands for the previous types of operations, so we can refactor our code to become like this:
+
+```python
+from failures import Reporter
+
+
+def get_user_info(user_id: int, raw_data: dict, reporter: Reporter = None) -> tuple[int, str | None, str | None]:
+  """Extracts username and email of the user with 'user_id' from 'raw_data'"""
+  reporter = (reporter or Reporter)('users')
+  user = reporter.required(lambda: raw_data['users'][user_id])
+  name = reporter.optional(lambda: user['name'])
+  email = reporter.safe(lambda: user['email'])
+  return user_id, name, email
+```
+
+This does the exact same 
+
+TODO ....
+
+three types of environment to be specific:
+
++ An environment for optional operations ``reporter.optional(...)``, allows us to execute a function inside an isolated 
+  environment and return its result if it succeeds, or return ``None`` ignoring the failure otherwise,
+  this is useful for expected failures that don't need to be reported.
++ An environment for monitored operations ``reporter.safe(...)``, it works the same as the previous method,
+  but it reports a failure if it occurs and also returns ``None`` as an alternative result.
++ An environment for required operations ``reporter.required(...)``, it executes 
 
 ````python
 from dataclasses import dataclass
-from failures import Reporter, REQUIRED, OPTIONAL
+from failures import Reporter
 
 @dataclass
 class User:
     id: int
-    name: str
+    name: str | None
     email: str | None
     phone: str | None
 
-def parse_user(data: dict, reporter: Reporter) -> User:
-    try:
-        user_id = int(data['user']['id'])
-    except (KeyError, TypeError, ValueError) as err:
-        reporter('user.id', REQUIRED).report(err)
-    try:
-        user_name = data['user']['personal']['name']
-    except (KeyError, TypeError) as err:
-        reporter('user.name', REQUIRED).report(err)
-    try:
-        user_email = data['user']['contact']['email']
-    except (KeyError, TypeError) as err:
-        reporter('user.email').report(err)
-        user_email = None
-    try:
-        user_phone = data['user']['contact']['phone']
-    except (KeyError, TypeError) as err:
-        reporter('user.phone', OPTIONAL).report(err)
-        user_phone = None
-    return User(user_id, user_name, user_email, user_phone)
 ````
 
 This example is self-explanatory,

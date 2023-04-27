@@ -155,12 +155,21 @@ class Reporter:
 
     def failure(self, error: Exception, **details) -> Failure:
         """Creates a failure from error, details and reporter's information"""
-        source = self.label
-        if isinstance(error, FailureException) and error.reporter.root is not self.root:
-            # Unwrap labeled failures
-            source = _join(source, error.source)
-            details = {**details, **error.details}
-            error = error.error
+        if isinstance(error, FailureException):
+            # Unwrap Failure exception
+            if error.reporter.root is self.root:
+                # From a bound reporter
+                source = error.source
+                details = error.details
+                error = error.error
+            else:
+                # From an unbound reporter
+                source = _join(self.label, error.source)
+                details = {**details, **error.details}
+                self.failures.extend(error.reporter.failures)
+                error = error.error
+        else:
+            source = self.label
         return Failure(source, error, {**self.details, **details})
 
     def report(self, error: Exception, **details) -> None:
