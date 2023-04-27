@@ -457,113 +457,113 @@ def get_user_info(user_id: int, raw_data: dict, reporter: Reporter = None) -> tu
   return user_id, name, email
 ```
 
-This does the exact same 
+This does the exact same thing as the previous with much lesser code, ``.optional(...)`` executes a function in an
+isoated environment and returns its result if it succeeds, or returns ``None`` ignoring the failure otherwise,
+``.safe(...)``, it works the same way but reports the failure instead of ignoring them, and ``.required(...)``
+executes a function in a labeled environment that captures, adds metadata then re-raises the failure.
 
-TODO ....
+All three methods have the same API, they take a callable _(mainly functions)_ as first argument, then positional 
+and keyword argument that will be passed to that callable.
 
-three types of environment to be specific:
-
-+ An environment for optional operations ``reporter.optional(...)``, allows us to execute a function inside an isolated 
-  environment and return its result if it succeeds, or return ``None`` ignoring the failure otherwise,
-  this is useful for expected failures that don't need to be reported.
-+ An environment for monitored operations ``reporter.safe(...)``, it works the same as the previous method,
-  but it reports a failure if it occurs and also returns ``None`` as an alternative result.
-+ An environment for required operations ``reporter.required(...)``, it executes 
-
-````python
-from dataclasses import dataclass
+To demonstrate this, we can change our code and add a utility function that gets nested value by keys:
+```python
 from failures import Reporter
 
-@dataclass
-class User:
-    id: int
-    name: str | None
-    email: str | None
-    phone: str | None
 
-````
-
-This example is self-explanatory,
-we're extracting user data from a raw data source and returning a well-structured object.
-We want to raise a failure exception if id or name are missing, so we marked those operations as required,
-and we want to ignore missing phone numbers and email substituting them by ``None`` in case of their absence,
-but we want to still report missing emails.
-
-But seriously, this code was very ugly even with just 4 operations.
-
-The reporter provides a shorthand method to automate calling all of this, the ``Reporter.safe`` method.
-
-We can refactor the previous function to become:
-
-````python
-from dataclasses import dataclass
-from failures import Reporter, REQUIRED, OPTIONAL
-
-@dataclass
-class User:
-    id: int
-    name: str
-    email: str | None
-    phone: str | None
-
-def parse_user(data: dict, reporter: Reporter) -> User:
-    reporter = reporter('user')
-    user_id = reporter('id', REQUIRED).safe(lambda: int(data['user']['id']))
-    user_name = reporter('name', REQUIRED).safe(lambda: data['user']['personal']['name'])
-    user_email = reporter('email').safe(lambda: data['user']['contact']['email'])
-    user_phone = reporter('phone', OPTIONAL).safe(lambda: data['user']['contact']['phone'])
-    return User(user_id, user_name, user_email, user_phone)
-````
-Now it looks less ugly while returning the same result.
-
-````{note}
-The ``safe`` methed takes a callable as first argumen, for that reason we created an annonymous ``lambda`` function, 
-any remaining arguments will be passed directly to that callable.
-````
-
-Alternatively, we could use a utility function that extracts from dictionaries like
-
-````python
-def extract(source: dict, *keys: Any, cast: Callable[[Any], Any] = None) -> Any:
+def get(data: dict, *keys):
+  with Reporter('get_by_key'):
     for key in keys:
-        source = source[key]
-    if callable(cast):
-       return cast(source)
-    return source
+      data = data[key]
+  return data
 
-def parse_user(data: dict, reporter: Reporter) -> User:
-    ...
-    user_id = reporter('id', REQUIRED).safe(extract, data, 'user', 'id', cast=int)
-    user_name = reporter('email', REQUIRED).safe(extract, data, 'user', 'personal', 'name')
-    ...
-````
+def get_user_info(user_id: int, raw_data: dict, reporter: Reporter = None) -> tuple[int, str | None, str | None]:
+  """Extracts username and email of the user with 'user_id' from 'raw_data'"""
+  reporter = (reporter or Reporter)('users')
+  user = reporter.required(get, raw_data, 'users', user_id)
+  name = reporter.optional(get, user, 'name')
+  email = reporter.safe(get, user, 'email')
+  return user_id, name, email
+```
+This feature is useful when using predefined utility functions within the reporter context instead of lambda.
+
+```{warning}
+Executing directly an instruction like ``reporter.optional(user['name'])`` will raise an exception and will not 
+be handeled, we need to pass a function that reporter will call.
+```
 
 ### Safe async support
-To evaluate asynchronous functions inside a safe context, we can use ``Reporter.safe_async()`` method,
-this will await the coroutine inside the context to catch any exception.
+Reporter also has support for asynchronous functions, same as ``.optional(...)``, ``.safe(...)`` and ``.required(...)``,
+we can call and ``await`` async functions using ``.optional_async(...)``, ``.safe_async(...)`` and ``.required_async(...)``
 
 This is an example of how to use it:
 
-````{code-block} python
-:emphasize-lines: 15
-
-from dataclasses import dataclass
+````python
 from httpx import AsyncClient
-from failures import Reporter, REQUIRED, OPTIONAL
+from failures import Reporter
 
-@dataclass
-class User:
-    id: int
-    name: str
-    email: str | None
-    phone: str | None
+...
 
-
-async def get_user(user_id: int, client: AsyncClient, reporter: Reporter) -> User:
-    reporter = reporter('user')
-    response = await reporter('request.get', REQUIRED).safe_async(client.get, f"https://api.example.com/users/{user_id}")
-    raw_data = reporter('parse.json', REQUIRED).safe(response.json)
-    reporter = reporter('extract')
-    user_id = reporter('id', REQUIRED).safe(lambda: int(raw_data['user']['id']))
+async def get_user(client: AsyncClient, user_id: int, *, reporter: Reporter = None):
+    reporter = (reporter or Reporter)('user')
+    response = await reporter('get-request').required_async(client.get, f"https://example.com/users/{user_id}")
+    raw_data = reporter('parse.json').required(response.json)
     ...
+````
+
+```{note}
+Async alternative methods must be awaited.
+```
+
+## Scoped functions
+Usually our functions receive a reporter, either a required or an optional,
+and define a top level context manager as seen in previous examples like this:
+````python
+def inverse_sqrt(num):
+  with Reporter('inverse_sqrt'):
+    with Reporter('converting'):
+      number = float(num)
+...
+````
+This makes our code ugly adding extra indentations and making us repeat the name of the function ``'inverse_sqrt'``.
+
+To tackle this ergonomic issue, ``failures`` comes with a decorator that automates this process, it's called ``scoped``
+and it can be used like this
+````python
+from failures import Reporter, scoped
+
+@scoped
+def inverse_sqrt(num):
+  with Reporter('converting'):
+    number = float(num)
+...
+````
+This keeps the same functionality while reducing one level of indentation and names the scope based on the function's
+name.
+
+If this is not the desired behaviour, and we need our scope to have a different name than the function's,
+we can override it by calling the decorator with the label as an argument like this:
+````python
+from failures import Reporter, scoped
+
+@scoped('evaluating_inverse_square_root')
+def inverse_sqrt(num):
+  with Reporter('converting'):
+    number = float(num)
+...
+````
+
+Now this is nice and all, but this decorator has more purpose than being just a syntactical sugar, it also detects
+and derives reporters passed as arguments to the decorated function, check this out
+
+````pycon
+>>> from failures import scoped, Reporter
+>>>
+>>> @scoped
+... def testing(*args, reporter=None):
+...     print(reporter)
+>>> rep = Reporter('main')
+>>> testing(reporter=rep)
+Reporter('main.testing')
+>>> testing()
+
 ````
