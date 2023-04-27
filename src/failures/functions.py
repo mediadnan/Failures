@@ -34,8 +34,16 @@ def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
         if not _is_param_reporter(_arg, spec.annotations.get(_arg, NOTSET)):
             continue
 
+        try:
+            default = spec.defaults[idx - len(spec.args)]
+        except IndexError:
+            default = None
+
         def _get(args: tuple, _kwargs: Dict[str, Any]) -> Optional[Reporter]:
-            return args[idx]
+            try:
+                return args[idx]
+            except IndexError:
+                return default
 
         def _set(args: tuple, kwargs: Dict[str, Any], reporter: Reporter) -> Tuple[tuple, Dict[str, Any]]:
             _args = list(args)
