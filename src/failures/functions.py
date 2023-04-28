@@ -32,6 +32,8 @@ def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
 ]:
     spec = inspect.getfullargspec(func)
     name = get_func_name(func)
+
+    # Check if positional arguments contain the reporter
     for idx, _arg in enumerate(spec.args):
         try:
             default = spec.defaults[idx - len(spec.args)]
@@ -55,8 +57,10 @@ def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
             except IndexError:
                 _args.append(reporter)
             return tuple(_args), kwargs
+
         return _get, _set
 
+    # Check if keyword arguments contain the reporter
     for _arg in spec.kwonlyargs:
         try:
             default = spec.kwonlydefaults[_arg]
@@ -78,7 +82,10 @@ def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
         def _set(args: tuple, kwargs: Dict[str, Any], reporter: Reporter) -> Tuple[tuple, Dict[str, Any]]:
             kwargs[_arg] = reporter
             return args, kwargs
+
         return _get, _set
+
+    # Return default 'get' and 'set' functions
     return lambda _a, _k: None, lambda a, k, _: (a, k)
 
 
@@ -138,10 +145,10 @@ def scoped(arg=None, /):
                     return func_(*args, **kwargs)
         wrap.__signature__ = inspect.signature(func_)
         return functools.update_wrapper(wrap, func_)
-    if arg is None:
+    if arg is None:  # In case it was used with emtpy parenthesis @scope()
         return decorator
-    elif callable(arg):
+    elif callable(arg):  # In case it was used without parenthesis @scope
         return decorator(arg)
-    elif isinstance(arg, str):
+    elif isinstance(arg, str):  # In case it was called with a name @scope("name")
         return lambda func: decorator(func, arg)
     raise TypeError("@scoped decorator expects a callable as first argument")
