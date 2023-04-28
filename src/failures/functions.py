@@ -5,7 +5,7 @@ from typing import Callable, Any, Optional, Union, Dict, Tuple, overload
 
 from typing_extensions import get_origin, get_args
 
-from .core import Reporter, P, T, FunctionVar
+from .core import Reporter, P, T, FunctionVar, _invalid
 
 REPORTER_ARG_NAME = 'reporter'
 NOTSET = object()
@@ -17,12 +17,13 @@ except AttributeError:
     pass
 
 
-def _is_param_reporter(name: str, annotation: Any) -> bool:
-    _reporter_hint = (annotation is Reporter or
-                      (get_origin(annotation) in _union_types and
-                       Reporter in get_args(annotation)))
-    _no_annotation = annotation is NOTSET
-    return _reporter_hint or (name == 'reporter' and _no_annotation)
+def _is_param_reporter(name: str, annotation: Any, default: Any) -> bool:
+    _type_hinted_reporter = (annotation is Reporter or
+                             (get_origin(annotation) in _union_types and
+                              Reporter in get_args(annotation)))
+    _name_hinted_reporter = name == 'reporter' and annotation is NOTSET
+    _right_default = default is NOTSET or default is None or isinstance(default, Reporter)
+    return (_type_hinted_reporter or _name_hinted_reporter) and _right_default
 
 
 def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
@@ -30,32 +31,49 @@ def _get_set_reporter_from_signature(func: Callable, /) -> Tuple[
     Callable[[tuple, Dict[str, Any], Reporter], Tuple[tuple, Dict[str, Any]]],
 ]:
     spec = inspect.getfullargspec(func)
+    name = get_func_name(func)
     for idx, _arg in enumerate(spec.args):
-        if not _is_param_reporter(_arg, spec.annotations.get(_arg, NOTSET)):
-            continue
-
         try:
             default = spec.defaults[idx - len(spec.args)]
-        except IndexError:
-            default = None
+        except (IndexError, TypeError):
+            default = NOTSET
+        if not _is_param_reporter(_arg, spec.annotations.get(_arg, NOTSET), default):
+            continue
 
         def _get(args: tuple, _kwargs: Dict[str, Any]) -> Optional[Reporter]:
             try:
                 return args[idx]
             except IndexError:
-                return default
+                if default is not NOTSET:
+                    return default
+                raise _invalid(TypeError, f"{name}() is missing the reporter as required positional argument") from None
 
         def _set(args: tuple, kwargs: Dict[str, Any], reporter: Reporter) -> Tuple[tuple, Dict[str, Any]]:
             _args = list(args)
-            _args[idx] = reporter
+            try:
+                _args[idx] = reporter
+            except IndexError:
+                _args.append(reporter)
             return tuple(_args), kwargs
         return _get, _set
+
     for _arg in spec.kwonlyargs:
-        if not _is_param_reporter(_arg, spec.annotations.get(_arg, NOTSET)):
+        try:
+            default = spec.kwonlydefaults[_arg]
+        except (KeyError, TypeError):
+            default = NOTSET
+        if not _is_param_reporter(_arg, spec.annotations.get(_arg, NOTSET), default):
             continue
+        if default is NOTSET:
+            default = None
 
         def _get(_args: tuple, kwargs: Dict[str, Any]) -> Optional[Reporter]:
-            return kwargs[_arg]
+            try:
+                return kwargs[_arg]
+            except KeyError:
+                if default is not NOTSET:
+                    return default
+                raise _invalid(TypeError, f"{name}() is missing the reporter as required keyword argument") from None
 
         def _set(args: tuple, kwargs: Dict[str, Any], reporter: Reporter) -> Tuple[tuple, Dict[str, Any]]:
             kwargs[_arg] = reporter
