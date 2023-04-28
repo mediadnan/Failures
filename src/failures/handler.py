@@ -199,7 +199,7 @@ class Handler:
         if exc_type is None:
             return True
         elif issubclass(exc_type, FailureException):
-            self(exc_val)
+            self(exc_val.failure)
             return True
         return False
 
