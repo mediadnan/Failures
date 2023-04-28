@@ -346,24 +346,24 @@ that failure will be labeled and re-raised with context details, so the caller f
 
 Note here that we didn't explicitly return ``None`` when a failure occurs, nor that we needed to wrap every step in
 ``try/except`` blocks. 
-The reporter under ``with`` statement will automatically catch and add metadata to each failure
+The reporter under ``with`` statement will automatically catch and add its metadata to each failure
 then re-raise it to the outer layer reporter's scope or handler.
 
-Note also that we don't need to pass the reporter between functions as argument, the failure metadata passed via 
+Note also that we don't need to pass reporters between functions as arguments; the failure's metadata is passed via 
 the exception.
 
 One more thing to point out here, is that ``with Reporter('inverse_sqrt') as reporter`` returns
-the ``Reporter('inverse_sqrt')`` itself, and in this specific case the reporter is not really neaded as nothing will 
+the ``Reporter('inverse_sqrt')`` itself, and in this specific case the reporter is not really needed as nothing will 
 be reported.
 
-So in this context, this:
+So in this context, this code:
 ```python
 ...
 with Reporter('inverse_sqrt') as reporter:
     with reporter('converting'):
         ...
 ```
-Will have the same effect as this:
+Will have the same effect as this one:
 ```python
 ...
 with Reporter('inverse_sqrt'):
@@ -399,9 +399,23 @@ Failure(source='inverse_sqrt.square_root', error=ValueError('math domain error')
 We don't need to handle raised exceptions using ``try/except`` blocks, in the next chapter we will discuss how to handle
 them using ``failures.Handler``.
 
-\
-\
-TODO ...
+But this is how it can be used:
+
+````pycon
+>>> from failures import Reporter, Handler
+>>> def inverse_sqrt(num):
+...     with Reporter('inverse_sqrt') as reporter:
+...         with reporter('converting'):
+...             number = float(num)
+...         ...
+>>> with Handler(print):
+...     inverse_sqrt("twenty five")
+...
+Failure(source='inverse_sqrt.converting', error=ValueError("could not convert string to float: 'twenty five'"), details={})
+````
+
+### Report or raise?
+...TODO
 
 ## Execution context
 When we find ourselves working with multiple inline operations, wrapping each line in ```try/except``` blocks
@@ -557,13 +571,43 @@ and derives reporters passed as arguments to the decorated function, check this 
 
 ````pycon
 >>> from failures import scoped, Reporter
->>>
+... 
 >>> @scoped
-... def testing(*args, reporter=None):
+... def testing(*args, reporter):
 ...     print(reporter)
 >>> rep = Reporter('main')
 >>> testing(reporter=rep)
 Reporter('main.testing')
 >>> testing()
+Reporter('testing')
+````
+
+This feature gives more flexibility to the decorated function, it may accept a reporter and internally use it to report
+failures or even pass it to other _'scoped'_ functions.
+
+In the previous example, the reporter has been passed as a required 
+[keyword-only argument;](https://peps.python.org/pep-3102/) however, it can be an optional keyword-only argument
+or a required or optional positional arguments like this
+
+````pycon
+>>> from failures import scoped, Reporter
+>>> @scoped
+... def testing(_arg1, reporter):    # required positional arg
+...     print(reporter)
+>>> testing(None, Reporter('main'))
+Reporter('main.testing')
+>>> testing(None)
+Traceback (most recent call last):
+    ...
+TypeError: testing() is missing the reporter as required positional argument
+>>> @scoped
+... def testing(_arg1, reporter=None):    # optional positional arg
+...     print(reporter)
+>>> testing(None, Reporter('main'))
+Reporter('main.testing')
+>>> testing(None)
+Reporter('testing')
 
 ````
+
+...TODO
