@@ -42,11 +42,18 @@ and ``users.registration.email_parsing``, that would be more readable for us whe
 So that problem is what ``failures`` is trying to efficiently solve, it provides tools to both report and handle
 different failures easily reducing boilerplate code needed to do it, supporting both simple and complex use-cases.
 
-This documentation will serve both as tutorial and reference to use this library, containing use-case
-examples and api reference, and it's split into two parts; 
+This document will serve both as tutorials for new users and reference to look into when using this library, 
+it will be divided into two main chapters;
 
-1. Capturing, labeling and reporting failures _(see [Reporting failures](#reporting))_,
-2. Handling collected failures _(see [Handling failures](#handling))_. 
+1. [Reporting failures](#reporting): Explains how to capture, label and gather failures,
+2. [Handling failures](#handling): Explains how to handle the collected failures. 
+
+Reporting and handling failures is done many times throughout the application's lifecycle, to be specific; 
+it is triggered each time an action is called.
+So in the context of a web app, for example, the failure reporting lifecycle must start when the app receives a request
+from the client until it sends the response back; the failure handling should be either just before or after sending 
+the response, some failures should be handled before to provide the client with a descriptive response, others
+can be processed after that if they are not related to the client.
 
 ## Installation
 ``failures`` is available for python 3.8 or newer, to be able to use it, 

@@ -1,39 +1,53 @@
 (reporting)=
 # Reporting failures
-The first step dealing with failures is to capture and label them, this can be done by using ``failures.Reporter``
-object, in this chapter we will learn what a reporter is and how to create and use reporters in different situations. 
-
-The ``Reporter`` api can be reviewed later in the {func}`failure.Repoeither rter` reference page.
+The first step dealing with failures is to collect them, this can be done by using {class}``failures.Reporter``
+object, and in this chapter we will learn what a reporter is and how to use it in different situations. 
 
 ## Creating a reporter
-A reporter is created using the ``Reporter`` constructor that expects a name _(label)_ as mandatory
-first _(positional-only)_ argument, each reporter has a label used to mark application failures.
+The first step of using a reporter is to create one, and is done by importing ``Reporter`` class from ``failures``
+and call it with a name _(label)_ as mandatory first argument, this name should be descriptive and related to the 
+action that will be monitored.
 
 ````pycon
+>>> # Creating our first reporter
 >>> from failures import Reporter
->>> reporter = Reporter('my_first_reporter')
+>>> reporter = Reporter('testing_reporter')
 >>> reporter
-Reporter('my_first_reporter')
+Reporter('testing_reporter')
 >>> reporter.label
-'my_first_reporter'
+'testing_reporter'
 ````
-This reporter can be used now for storing failures, we can demonstrate that by calling ``reporter.report(...)``
+This reporter can be used now to gather failures, we can do so by calling ``reporter.report(...)``
 ````pycon
 >>> reporter.report(ValueError("this is a value error"))
 >>> reporter.report(TypeError("this is a type error"))
 >>> reporter.report(KeyError("this is a key error"))
 >>> for failure in reporter.failures:
 ...   print(failure)
-Failure(source='my_first_reporter', error=ValueError('this is a value error'), details={})
-Failure(source='my_first_reporter', error=TypeError('this is a type error'), details={})
-Failure(source='my_first_reporter', error=KeyError('this is a key error'), details={})
+Failure(source='testing_reporter', error=ValueError('this is a value error'), details={})
+Failure(source='testing_reporter', error=TypeError('this is a type error'), details={})
+Failure(source='testing_reporter', error=KeyError('this is a key error'), details={})
 ````
-calling ``reporter.report(...)`` stores the error inside the reporter object, so it can be accessed later for handling,
-it does also add some metadata like the source and additional details, the source as we said is an explicit label
-that we gave our reporter, and additional details can be set as key-value information about the context and the error.
+The ``report(...)`` method is used to store an error in the reporter,
+it can be accessed later by the ``reporter.failures`` property, it returns the list of failures associated with that 
+reporter.
 
-We can add details to both reporter and error, the failure will merge both details together when it reports the failure.
+A failure is just a ``NamedTuple`` object used by reporters to encapsulate the error itself with additional
+metadata, namely ``source`` and ``details``.
+
+The source of failure tells us which reporter has reported that error, additional details are objects that we decide to
+store together with that error, like input data, failure description or some other useful information.
+
+When handling failures, we will be interacting with the {class}`failures.Failure` object, and we will talk about that 
+in more depth in the next chapter.
+
+Details however can be added to the failure in two different ways, either as context details or failure-specific details;
+context details are passed directly as keyword-arguments to the constructor ``Reporter(...)``, they're bound to
+a specific reporter and will be added to all it failures, failure details are passed to the ```report(...)``` method,
+they are related to that failure and will only be added to it.
+
 ```pycon
+>>> # Testing failure details
 >>> from failures import Reporter
 >>> reporter = Reporter('my_label', environment='production', another='info')
 >>> reporter.report(ValueError("this is a value error"), input=25.0)
@@ -46,23 +60,11 @@ Failure(source='my_label', error=ValueError('this is a value error'), details={'
 Failure(source='my_label', error=TypeError('this is a type error'), details={'environment': 'production', 'another': 'overriden', 'input': None})
 Failure(source='my_label', error=KeyError('this is a key error'), details={'environment': 'production', 'another': 'info'})
 ```
-The details that we passed to ``Reporter(...)`` are context details, they're added to every failure that ``reporter``
-reports, however, specific details can be added for each failure via the ``.report(...)`` method.
-If a key has been passed as context and failure-specific detail, the one passed to ``reporter.report(...)``
-will override the one passed to ``Reporter(...)``.
-
-Now before proceeding to the next section, let's make some reporter-related concepts clear.
-
-### Failures
-Failures, as shown in the previous example, are **named tuple** object that reporters use to encapsulate
-errors together with their source labels and optionally some additional details.
-
-The failure attributes can be accesses either as members ``failure.source`` or as tuple items ``failure[0]``.
-
-More technical details can be reviewed at {func}`failures.Failure` api reference.
+In the previous example, ``{'environment': 'production', 'another': 'info'}`` has been added to all three failures,
+but as we passed ``'another': 'overriden'`` the second failure, it has overriden the one we defined as context detail.
 
 ### Naming conventions
-However, the name of the reporter is not random, it must be a non-empty string and can only contain letters,
+The name of a reporter is not random, it must be a non-empty string and can only contain letters,
 digits, ``-`` and ``_``, like ``main``, ``evaluate_percentage``, ``func1``, ``get-item-price`` ...
 Almost the same way one can name variables.
 And if for some reason the reporter needs multiple labels, this is allowed by joining those labels with dots,
@@ -76,7 +78,7 @@ This validation mechanism helps to ensure a good labeling quality, as this is a 
 
 ## Sub reporters
 We can derive new reporters from an existing one the same way we create a one by ``Reporter(...)``,
-this is achieved by calling the reporter itself with a new name like this
+this is done by calling the reporter itself with a new name like this
 ```pycon
 >>> from failures import Reporter
 >>> reporter = Reporter('main')
@@ -98,16 +100,16 @@ when we pass reporters as arguments like this.
 ...
 >>> class JSONDecodeError(Exception): ...
 ...
->>> rep = Reporter('product', id='488sd1c7a', store='home_and_garden_store')
->>> rep_download = rep('download', method='GET', endpoint='https://home_and_garden_store.example.com/api/products')
+>>> rep = Reporter('product', id='488sd1c7a', store='home_and_garden')
+>>> rep_download = rep('download', method='GET', endpoint='https://api.example.com/products?category=home_and_garden')
 >>> rep_parse = rep('parse', parser='orjson.loads')
 >>> rep_download.report(ClientResponseError(404, "Product not found"))
 >>> rep_parse.report(JSONDecodeError("Invalid json string"))
 >>> for failure in rep.failures:
 ...     print(failure)
 ...
-Failure(source='product.download', error=ClientResponseError(404, 'Product not found'), details={'id': '488sd1c7a', 'store': 'home_and_garden_store', 'method': 'GET', 'endpoint': 'https://home_and_garden_store.example.com/api/products'})
-Failure(source='product.parse', error=JSONDecodeError('Invalid json string'), details={'id': '488sd1c7a', 'store': 'home_and_garden_store', 'parser': 'orjson.loads'})
+Failure(source='product.download', error=ClientResponseError(404, 'Product not found'), details={'id': '488sd1c7a', 'store': 'home_and_garden', 'method': 'GET', 'endpoint': 'https://api.example.com/products?category=home_and_garden'})
+Failure(source='product.parse', error=JSONDecodeError('Invalid json string'), details={'id': '488sd1c7a', 'store': 'home_and_garden', 'parser': 'orjson.loads'})
 ````
 As shown in this example, both sub-reporters include context details from their common ancestor ``details={'id': ..., 'store': ...}``
 and both are labeled with ``product.(...)``.
@@ -227,8 +229,8 @@ True
 ````
 
 ## Labeled scopes
-The reporter is often used to report failures, and by reporting I mean keeping failures until the called function 
-returns, and we explicitly decide to handle registered failures.
+The reporter is often used to report failures, and by reporting I mean keeping failures until an action ends,
+and explicitly decide to handle those registered failures.
 
 Consider a simple example, a function that takes a number, either ``str``, ``int`` or ``float`` and evaluates the square
 root of its inverse, and just for demonstration purpose, we will split it into two functions.
@@ -267,8 +269,8 @@ def _inv_sqrt(num: float, reporter: Reporter) -> float | None:
         return round(num, 2)
 ```
 
-The main function ``inverse_sqrt`` expects a valid number that can be converted to a ``float``, it doesn't require
-a reporter, so we called ``(reporter or Reporter)('inverse_sqrt')``, this basically means call
+The main function ``inverse_sqrt`` expects a valid number that can be converted to a ``float``,
+it doesn't require a reporter, so we called ``(reporter or Reporter)('inverse_sqrt')`` and this basically means call
 ``reporter('inverse_sqrt')`` if there is one or call ``Reporter('inverse_sqrt')`` otherwise.
 This reporter will be the scope reporter for the next operations, then we pass it to the helper function ``_inv_sqrt``.
 
@@ -278,14 +280,14 @@ Now let's test our function in the interpreter:
 >>> from failures import Reporter
 >>> from invsqrt import inverse_sqrt
 >>> # Good cases
->>> inverse_sqrt(.25)  # float / without reporter
+>>> inverse_sqrt(.25)  # float / without a reporter
 2.0
 >>> rep = Reporter('main')
->>> inverse_sqrt(4, rep)  # int / with reporter
+>>> inverse_sqrt(4, rep)  # int / with a reporter
 0.5
 >>> rep.failures
 []
->>> inverse_sqrt("0.94", rep)  # str / with reporter
+>>> inverse_sqrt("0.94", rep)  # str / with a reporter
 1.03
 >>> rep.failures
 []
@@ -308,10 +310,10 @@ Failure(source='main.inverse_sqrt.inverting', error=ZeroDivisionError('float div
 >>> rep.failures.pop()
 Failure(source='main.inverse_sqrt.square_root', error=ValueError('math domain error'), details={})
 ````
-In that specific case, the reporter was misused as all steps are mandatory and dependent.
-In cases like this one, we really want the function to fail and skip the remaining code,
+In this example, the reporter was misused as all steps are mandatory and dependent,
+so in cases like this we really want the function to fail and skip the remaining code,
 and only handle the that failure outside. 
-Returning ``None`` in this case can become buggy if the calling function expects an actual ``float``.
+Returning ``None`` can also become buggy if the calling function expects an actual ``float``.
 
 A better alternative in this case is to use ``Reporter`` as a failure context instead of using it as a failure reporter,
 this can be achieved by using the ``with`` statement to label each part of code.
@@ -416,7 +418,10 @@ Failure(source='inverse_sqrt.converting', error=ValueError("could not convert st
 ````
 
 ### Report or raise?
-...TODO
+Choosing whether to report or raise a failure depends on the nature of the operation;
+if it's an essential part of the overall action, then it should be raised
+and only handled at the outermost layer of that action, but if the failure is not critical it most be reporter to
+be handled after the action has ended.
 
 ## Execution context
 When we find ourselves working with multiple inline operations, wrapping each line in ```try/except``` blocks
@@ -541,8 +546,8 @@ def inverse_sqrt(num):
 ````
 This makes our code ugly adding extra indentations and making us repeat the name of the function ``'inverse_sqrt'``.
 
-To tackle this ergonomic issue, ``failures`` comes with a decorator that automates this process, it's called ``scoped``
-and it can be used like this
+To tackle this ergonomic issue, ``failures`` comes with a decorator that automates this process, 
+it's called {func}`failures.scoped` and it can be used like this
 ````python
 from failures import Reporter, scoped
 
