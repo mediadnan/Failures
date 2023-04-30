@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "failures"
 dynamic = ["version", "dependencies"]
-description = "Labeling failures for humans"
+description = "Successfully dealing with failures"
 readme = "README.md"
 license = {text = "MIT License"}
 requires-python = ">=3.8"
