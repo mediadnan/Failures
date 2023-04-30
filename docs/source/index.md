@@ -1,8 +1,8 @@
 # Failures
-_labeling failures for humans_
+_Successfully dealing with failures_
 
 ## Introduction
-In most applications that interact with data (_specially inconsistent data_) failures are one thing to expect,
+In most applications that interact with data (_and inconsistent data in particular_) failures are one thing to expect,
 and more so in dynamically typed languages like python.
 A failure may happen when trying to access a dictionary key that doesn't exist in a specific case, 
 or trying to perform string operations on a returned function value that has returned ``None`` instead,
@@ -12,13 +12,14 @@ As a default behavior, the interpreter raises a specific ``Exception`` to stop t
 bugs and issues, giving us traceback information about where that error happened and why it happened.
 
 However, in production environments, we rarely want our application to crash for every failure that occurs, 
-and we want it to be more robust against expected and unexpected failures. But in the other hand, silencing 
-and ignoring all failures is not a desired behavior either, as it doesn't give us isight about what just happened.
+and we want it to be more robust against expected and unexpected failures.
+But on the other hand, silencing and ignoring all the failures is not a desired behavior either, 
+as it doesn't give us isight about what is happening on our application.
 
-The solution is to catch and handle each exception while performing an operation that might fail,
-wrapping it with ``try-except`` in place to provide alternative code instead, together with logging,
-this can be enough for smaller applications. It solves both problems avoiding crashes and reporting the issue
-to let us know what happened.
+The solution is to catch and handle each exception when performing an operation that might fail,
+wrapping it within ``try-except`` block to catch and log to that failure while providing and alternative result 
+in that case, and this can be enough for smaller applications.
+It solves both problems; avoiding crashes and reporting the issue to let us know what happened.
 
 But when the application starts to grow with multiple components and modules, wrapping each operation in ``try-except`` 
 becomes tedious and repetitive, imagine wrapping many parts of the application with ``try-except`` blocks and
@@ -30,7 +31,7 @@ handling mechanism in the appropriate situation, this way we can avoid writing t
 
 Besides that, bigger apps contain reusable decoupled components, components that can be used by other components,
 and often they do not know the context where they're being used or which component is using them,
-util we inspect the traceback frames in case of failures to generate better reports ``logger.error(..., exc_info=...)``,
+unless we inspect the traceback frames in case of an error to generate better reports ``logger.error(..., exc_info=...)``,
 this will improve the reports together with exception information.
 
 This approach almost solves our problem of handling failures, but implementing a similar handling mechanism
@@ -38,17 +39,14 @@ across apps can also become repetitive, and default error tracebacks are more **
 it would be easier to also pinpoint the failure by its logical location like ``users.login.email_parsing``
 and ``users.registration.email_parsing``, that would be more readable for us when reading logs and reports.
 
-This library it's a solution to deal with application failures efficiently, it provides tools to both report and handle
-different failures easily reducing boilerplate code needed to do it supporting both simple and complex use-cases.
+So that problem is what ``failures`` is trying to efficiently solve, it provides tools to both report and handle
+different failures easily reducing boilerplate code needed to do it, supporting both simple and complex use-cases.
 
 This documentation will serve both as tutorial and reference to use this library, containing use-case
-examples and resource definitions, it splits dealing with failures in two phases; 
+examples and api reference, and it's split into two parts; 
 
-1. Capturing, labeling and reporting failures,
-2. Handling the captured failures with the appropriate function. 
-
-The first chapter will discuss in details different ways to label and report failures, the second one will go in details
-about how to handle the reported failures.
+1. Capturing, labeling and reporting failures _(see [Reporting failures](#reporting))_,
+2. Handling collected failures _(see [Handling failures](#handling))_. 
 
 ## Installation
 ``failures`` is available for python 3.8 or newer, to be able to use it, 
@@ -57,6 +55,10 @@ it must be installed in your environment from PyPI using the pip command.
 ````shell
 pip install failures
 ````
+
+## Bug report
+If you encounter any bug or issue using this library, or even want to contribute by giving us new suggestions;
+you can open an issue in the official [GitHub ``failures`` repository](https://github.com/mediadnan/Failures/issues). 
 
 ````{toctree}
     :hidden:

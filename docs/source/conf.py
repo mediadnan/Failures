@@ -14,6 +14,7 @@ release = '0.2'
 # General
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
     "myst_parser"
 ]
 templates_path = ['_templates']
@@ -61,6 +62,9 @@ html_theme_options = {
     },
 }
 
-# Autodoc configuration
+# AutoDoc configuration
 autodoc_member_order = 'bysource'
 autoclass_content = "both"
+
+# ViewCode configuration
+

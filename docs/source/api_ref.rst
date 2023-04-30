@@ -1,24 +1,25 @@
 =============
 API Reference
 =============
-This chapter contains technical core ``failures`` elements' api reference, it was directly and automatically
-generated from the source code.
+This page contains technical details about the interface of core ``failures`` elements,
+this was directly and automatically generated from the source code, and contains links
+to switch between source code and documentation.
 
-The same documentation can be accessed via the interpreter using the ``help(...)`` function.
+.. autoclass:: failures.Failure
+    :members:
 
-Failures' reporter
-------------------
 .. autoclass:: failures.Reporter
     :members:
     :special-members: __call__
 
-Reported failure
-................
-.. autoclass:: failures.Failure
-    :members:
+.. autofunction:: failures.scoped
 
-Failures' handler
------------------
 .. autoclass:: failures.Handler
     :members:
     :special-members: __call__
+
+.. autofunction:: failures.filtered
+
+.. autofunction:: failures.combine
+
+.. autofunction:: failures.print_failure

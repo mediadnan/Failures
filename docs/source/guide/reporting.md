@@ -1,3 +1,4 @@
+(reporting)=
 # Reporting failures
 The first step dealing with failures is to capture and label them, this can be done by using ``failures.Reporter``
 object, in this chapter we will learn what a reporter is and how to create and use reporters in different situations. 
