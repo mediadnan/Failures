@@ -61,20 +61,19 @@ pip install failures
 ````{toctree}
     :hidden:
     :caption: User Guide
-    :maxdepth: 2
-guide/reporter
-guide/scopes
-guide/handler
+    :maxdepth: 3
+guide/reporting
+guide/handling
 ````
 ````{toctree}
-    :maxdepth: 2
     :hidden:
+    :maxdepth: 2
     :caption: API Reference
 api_ref
 ````
 ````{toctree}
-    :maxdepth: 1
     :hidden:
+    :maxdepth: 1
     :caption: About
 versions
 license

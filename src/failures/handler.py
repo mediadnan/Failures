@@ -18,7 +18,7 @@ else:
         f"{colorama.Style.BRIGHT + colorama.Fore.LIGHTRED_EX}){colorama.Style.RESET_ALL} "
         f"{colorama.Style.DIM + colorama.Fore.CYAN}{{time}}{colorama.Fore.RESET}{colorama.Style.RESET_ALL}"
     )
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, Self
 
 from .core import Failure, FailureException, Reporter
 
@@ -192,7 +192,7 @@ class Handler:
         """Handles the failure by calling the internal handler"""
         self.__handler(failure)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type=None, exc_val=None, exc_tb=None) -> bool:

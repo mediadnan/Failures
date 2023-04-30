@@ -1,26 +1,24 @@
 =============
 API Reference
 =============
+This chapter contains technical core ``failures`` elements' api reference, it was directly and automatically
+generated from the source code.
 
-This section contains the API reference of core ``failures`` elements, this documentation has been generated
-from the source code.
+The same documentation can be accessed via the interpreter using the ``help(...)`` function.
 
-scope utility
--------------
-.. autofunction:: failures.scope
-
-The scope object is what gets created by the function :func:`failures.scope`, it's API
-is documented bellow
-
-Scope object
-------------
-.. autoclass:: failures.core.Scope
+Failures' reporter
+------------------
+.. autoclass:: failures.Reporter
     :members:
-    :undoc-members:
+    :special-members: __call__
 
-Scoped decorator
-----------------
-.. autofunction:: failures.scoped
+Reported failure
+................
+.. autoclass:: failures.Failure
+    :members:
 
-.. versionadded:: 0.2
-    added ``failures.scoped``
+Failures' handler
+-----------------
+.. autoclass:: failures.Handler
+    :members:
+    :special-members: __call__

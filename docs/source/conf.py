@@ -32,7 +32,7 @@ html_favicon = "../_static/icon.ico"
 html_logo = "../_static/logo.png"
 html_title = f"{project} {release} docs"
 html_short_title = f"{project} docs"
-html_static_path = ['_static']
+html_static_path = ['../_static']
 html_theme_options = {
     "sidebar_hide_name": True,
     "navigation_with_keys": True,
@@ -60,3 +60,7 @@ html_theme_options = {
         "color-brand-content": "#aa3a50",
     },
 }
+
+# Autodoc configuration
+autodoc_member_order = 'bysource'
+autoclass_content = "both"

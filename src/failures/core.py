@@ -120,8 +120,8 @@ class Reporter:
         return f'Reporter({self.label!r})'
 
     @property
-    def parent(self) -> None:
-        """Gets nothing as this reporter has no parent"""
+    def parent(self) -> Optional['Reporter']:
+        """Gets the reporter's parent if this was derived from one, or None instead"""
         return
 
     @property
@@ -201,7 +201,7 @@ class Reporter:
 
     def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls func(*args, **kwargs) inside a safe block and returns its result if
+        Calls func(\*args, \*\*kwargs) inside a safe block and returns its result if
         it succeeds, or returns None and report the failure otherwise.
         """
         try:
@@ -212,7 +212,7 @@ class Reporter:
 
     async def safe_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls await func(*args, **kwargs) inside a safe block and returns its result if
+        Calls await func(\*args, \*\*kwargs) inside a safe block and returns its result if
         it succeeds, or returns None and report the failure otherwise.
         """
         try:
@@ -224,7 +224,7 @@ class Reporter:
     @staticmethod
     def optional(func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls func(*args, **kwargs) inside a safe block and returns its result if
+        Calls func(\*args, \*\*kwargs) inside a safe block and returns its result if
         it succeeds, or returns None and ignores the failure otherwise.
         """
         try:
@@ -235,7 +235,7 @@ class Reporter:
     @staticmethod
     async def optional_async(func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls await func(*args, **kwargs) inside a safe block and returns its result if
+        Calls await func(\*args, \*\*kwargs) inside a safe block and returns its result if
         it succeeds, or returns None and ignores the failure otherwise.
         """
         try:
@@ -245,7 +245,7 @@ class Reporter:
 
     def required(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """
-        Calls func(*args, **kwargs) inside a safe block and returns its result if
+        Calls func(\*args, \*\*kwargs) inside a safe block and returns its result if
         it succeeds, or raises a labeled failure otherwise.
         """
         with self:
@@ -253,7 +253,7 @@ class Reporter:
 
     async def required_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """
-        Calls await func(*args, **kwargs) inside a safe block and returns its result if
+        Calls await func(\*args, \*\*kwargs) inside a safe block and returns its result if
         it succeeds, or raises a labeled failure otherwise.
         """
         with self:
@@ -288,7 +288,7 @@ class ReporterChild(Reporter):
 
     @cached_property
     def details(self) -> Dict[str, Any]:
-        """Gets reporters context details combined with its parents'"""
+        """Gets reporter's context details combined with its parents'"""
         return {**self.parent.details, **self._details}
 
     @property
