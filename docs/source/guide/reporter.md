@@ -591,23 +591,39 @@ or a required or optional positional arguments like this
 
 ````pycon
 >>> from failures import scoped, Reporter
+>>>
+>>> # reporter as a required positional argument
 >>> @scoped
-... def testing(_arg1, reporter):    # required positional arg
+... def testing(_arg1, reporter):
 ...     print(reporter)
+...
 >>> testing(None, Reporter('main'))
 Reporter('main.testing')
 >>> testing(None)
 Traceback (most recent call last):
     ...
 TypeError: testing() is missing the reporter as required positional argument
+>>>
+>>> # reporter as an optional keyword argument
 >>> @scoped
-... def testing(_arg1, reporter=None):    # optional positional arg
+... def testing(_arg1, reporter=None):
 ...     print(reporter)
+...
 >>> testing(None, Reporter('main'))
 Reporter('main.testing')
 >>> testing(None)
 Reporter('testing')
-
 ````
 
-...TODO
+The same goes for keyword-only arguments, either optional or required,
+``@scoped`` tries to detect the reporter in the function's signature following these steps in the same order:
+
+1. It looks into parameters' annotation, if it finds a parameter hinted with ``Reporter`` like ``fun(... r: Reporter)``,
+   whatever its name is, or whether it's a positional or keyword parameter, it supposes that is a reporter.
+2. If no type hint is found, the decorator tries to find the name ``'reporter'`` with no annotation, and supposes that
+   is the reporter, unless it has an annotation hinting another type, like ``reporter: HTMLReporter``.
+
+If the parameter has a default value other than ``Reporter(...)`` or ``None``, it is no longer considered a reporter.
+
+But if all those conditions are met, and that argument is not an instance of ``failures.Reporter`` or ``None``
+at runtime, a type error will be raised.

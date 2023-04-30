@@ -127,12 +127,16 @@ def scoped(arg=None, /):
         if is_async(func_):
             async def wrap(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
                 reporter = (_get(args, kwargs) or Reporter)(name_)
+                if not isinstance(reporter, Reporter) or reporter is None:
+                    raise _invalid(TypeError, f"The reporter got wrong type {type(reporter)!r}")
                 args, kwargs = _set(args, kwargs, reporter)
                 with reporter:
                     return await func_(*args, **kwargs)
         else:
             def wrap(*args: P.args, **kwargs: P.kwargs) -> Optional[T]:
                 reporter = (_get(args, kwargs) or Reporter)(name_)
+                if not isinstance(reporter, Reporter) or reporter is None:
+                    raise _invalid(TypeError, f"The reporter got wrong type {type(reporter)!r}")
                 args, kwargs = _set(args, kwargs, reporter)
                 with reporter:
                     return func_(*args, **kwargs)
