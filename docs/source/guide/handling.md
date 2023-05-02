@@ -70,14 +70,53 @@ Failure(source='reporter_name', error=Exception('test error'), details={})
 ````
 If the constructor ``Handler()`` is called without arguments, it will use {func}`print_failure` as its only handler.
 
-The handler object is also used as context manager (TODO...)
+The handler can process failures directly from the reporter using the {meth}`Handler.from_reporter` method,
+it automatically iterates over the reporter's registered failures.
 
+````pycon
+>>> from failures import Reporter, Handler
+>>> reporter = Reporter('testing_handler')
+>>> def fail(msg: str):
+...     raise Exception(msg)
+...
+>>> with Handler(print) as handler:
+...     reporter.safe(fail, "error 1")
+...     reporter.safe(fail, "error 2")
+...     reporter.required(fail, "error 3")  # this is the last step
+...     reporter.safe(fail, "will never be registered")
+...
+Failure(source='testing_handler', error=Exception('error 3'), details={})
+>>> handler.from_reporter(reporter)
+Failure(source='testing_handler', error=Exception('error 1'), details={})
+Failure(source='testing_handler', error=Exception('error 2'), details={})
+````
 
 ## Filtered handler
+Handlers can target only a specific group of failures, we can make different handlers for different groups of failures,
+and this is done by specifying a filter together with the handler when creating the {class}`failures.Handler` object.
+
+Failures can be filtered by source label or by exception type, in the next sections we will talk about them.  
+
+The filtered handlers can be made using {func}`failures.filtered` function like this
+
+````pycon
+>>> from failures import filtered
+>>> handler_func = filtered(print, ValueError)
+>>> # This filter will only handle failures with ValueError (or subclass) error instances
+>>> handler_func2 = filtered(print, ValueError, TypeError)
+>>> # This one will handle failures with errors either of TypeError or ValueError types
+````
+
+Or passing a filtered handler as tuple to the {class}`failures.Handler` constructor like this
+
+````pycon
+>>> from failures import Handler
+>>> handler = Handler((print, ValueError))
+>>> handler2 = Handler((print, ValueError, TypeError))
+````
 
 ### Filter by label
 
-TODO / Handling failures with specific label
 
 ### Filter by label pattern
 
@@ -86,10 +125,6 @@ TODO / Handling failures with a specific label pattern
 ### Filter by error type
 
 TODO / Handling failures from specific error type or types
-
-### Filter by severity
-
-TODO / Handling failures with specific severity
 
 ### Combining filters
 

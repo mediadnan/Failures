@@ -17,7 +17,14 @@ NamePattern = re.compile(r'^(\w+(\[\w+]|\(\w+\))?)+([-.](\w+(\[\w+]|\(\w+\))?))*
 
 
 class Failure(NamedTuple):
-    """Encapsulates failure information."""
+    """
+    Failure is an object that encapsulates the error
+    together with its source and additional details.
+
+    :param source: The dot separated labels leading to where the failure occurred,
+    :param error: The actual exception that caused the failure,
+    :param details: Additional user added metadata.
+    """
     source: str
     error: Exception
     details: Dict[str, Any]
@@ -80,8 +87,8 @@ def _is_validation_error(error: Exception) -> bool:
 
 class Reporter:
     """
-    Reporter object keeps track of its context to store and report errors
-    together with the source where those errors occurred.
+    Reporters are objects used to collect failures (errors) between function calls
+    and add context metadata and details, and pinpoint the source by labels.
     """
     __slots__ = ('__name', '__failures', '_details', '__dict__')
     __name: str
@@ -191,9 +198,7 @@ class Reporter:
             error: BaseException = None,
             _err_tb: TracebackType = None
     ) -> bool:
-        if error is None:
-            return True
-        elif isinstance(error, Exception) and not _is_validation_error(error):
+        if isinstance(error, Exception) and not _is_validation_error(error):
             raise FailureException(self.failure(error), self)
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
         # Or module validation errors that must be raised
