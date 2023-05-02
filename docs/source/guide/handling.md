@@ -70,7 +70,7 @@ Failure(source='reporter_name', error=Exception('test error'), details={})
 ````
 If the constructor ``Handler()`` is called without arguments, it will use {func}`print_failure` as its only handler.
 
-The handler object is also used as context manager 
+The handler object is also used as context manager (TODO...)
 
 
 ## Filtered handler
