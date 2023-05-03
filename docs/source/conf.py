@@ -25,7 +25,7 @@ exclude_patterns = []
 # autodoc_mock_imports = ["typing_extensions"]
 
 # MyST Parser
-myst_enable_extensions = ["attrs_block"]
+myst_enable_extensions = ["attrs_block", "attrs_inline"]
 
 # Theme
 html_theme = 'furo'
@@ -34,6 +34,7 @@ html_logo = "../_static/logo.png"
 html_title = f"{project} {release} docs"
 html_short_title = f"{project} docs"
 html_static_path = ['../_static']
+html_css_files = ['custom.css']
 html_theme_options = {
     "sidebar_hide_name": True,
     "navigation_with_keys": True,
