@@ -2,8 +2,8 @@
 _Successfully dealing with failures_
 
 ## Introduction
-In most applications that interact with data (_and inconsistent data in particular_) failures are one thing to expect,
-and more so in dynamically typed languages like python.
+In most applications that interact with data (_inconsistent data in particular_) failures are one thing to expect,
+and more so in loosely typed languages like python.
 A failure may happen when trying to access a dictionary key that doesn't exist in a specific case, 
 or trying to perform string operations on a returned function value that has returned ``None`` instead,
 and many more other failures to expect.
@@ -14,10 +14,10 @@ bugs and issues, giving us traceback information about where that error happened
 However, in production environments, we rarely want our application to crash for every failure that occurs, 
 and we want it to be more robust against expected and unexpected failures.
 But on the other hand, silencing and ignoring all the failures is not a desired behavior either, 
-as it doesn't give us isight about what is happening on our application.
+as it doesn't give us isight about what is happening in our application.
 
 The solution is to catch and handle each exception when performing an operation that might fail,
-wrapping it within ``try-except`` block to catch and log to that failure while providing and alternative result 
+wrapping it within ``try-except`` block to catch and log that failure while providing and alternative result 
 in that case, and this can be enough for smaller applications.
 It solves both problems; avoiding crashes and reporting the issue to let us know what happened.
 
@@ -52,8 +52,8 @@ Reporting and handling failures is done many times throughout the application's 
 it is triggered each time an action is called.
 So in the context of a web app, for example, the failure reporting lifecycle must start when the app receives a request
 from the client until it sends the response back; the failure handling should be either just before or after sending 
-the response, some failures should be handled before to provide the client with a descriptive response, others
-can be processed after that if they are not related to the client.
+the response, some should be handled before to give that client a descriptive response, others
+can be processed after for analytics and monitoring.
 
 ## Installation
 ``failures`` is available for python 3.8 or newer, to be able to use it, 
@@ -62,6 +62,11 @@ it must be installed in your environment from PyPI using the pip command.
 ````shell
 pip install failures
 ````
+
+If ``colorama`` is installed in your environment, the default handler will print failures highlighted with colors; 
+otherwise, it will print them normally.
+
+To install failures together with ``colorama``, we can install it using this command ``pip install "failures[colors]"``
 
 ## Bug report
 If you encounter any bug or issue using this library, or even want to contribute by giving us new suggestions;

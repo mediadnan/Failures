@@ -1,6 +1,6 @@
 (reporting)=
 # Reporting failures
-The first step dealing with failures is to collect them, this can be done by using {class}``failures.Reporter``
+The first step dealing with failures is to collect them, this can be done by using {class}`failures.Reporter`
 object, and in this chapter we will learn what a reporter is and how to use it in different situations. 
 
 ## Creating a reporter
@@ -17,7 +17,7 @@ Reporter('testing_reporter')
 >>> reporter.label
 'testing_reporter'
 ````
-This reporter can be used now to gather failures, we can do so by calling ``reporter.report(...)``
+This reporter can be used now to gather failures, we can do so by calling {meth}`failures.Reporter.report`
 ````pycon
 >>> reporter.report(ValueError("this is a value error"))
 >>> reporter.report(TypeError("this is a type error"))
@@ -50,15 +50,15 @@ they are related to that failure and will only be added to it.
 >>> # Testing failure details
 >>> from failures import Reporter
 >>> reporter = Reporter('my_label', environment='production', another='info')
->>> reporter.report(ValueError("this is a value error"), input=25.0)
-... reporter.report(TypeError("this is a type error"), input=None, another='overriden')
-... reporter.report(KeyError("this is a key error"))
+>>> reporter.report(ValueError("..."), input=25.0)
+... reporter.report(TypeError("..."), input=None, another='overriden')
+... reporter.report(KeyError("..."))
 >>> for failure in reporter.failures:
 ...   print(failure)
 ...
-Failure(source='my_label', error=ValueError('this is a value error'), details={'environment': 'production', 'another': 'info', 'input': 25.0})
-Failure(source='my_label', error=TypeError('this is a type error'), details={'environment': 'production', 'another': 'overriden', 'input': None})
-Failure(source='my_label', error=KeyError('this is a key error'), details={'environment': 'production', 'another': 'info'})
+Failure(source='my_label', error=ValueError('...'), details={'environment': 'production', 'another': 'info', 'input': 25.0})
+Failure(source='my_label', error=TypeError('...'), details={'environment': 'production', 'another': 'overriden', 'input': None})
+Failure(source='my_label', error=KeyError('...'), details={'environment': 'production', 'another': 'info'})
 ```
 In the previous example, ``{'environment': 'production', 'another': 'info'}`` has been added to all three failures,
 but as we passed ``'another': 'overriden'`` the second failure, it has overriden the one we defined as context detail.

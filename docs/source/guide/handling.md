@@ -100,33 +100,162 @@ Failures can be filtered by source label or by exception type, in the next secti
 The filtered handlers can be made using {func}`failures.filtered` function like this
 
 ````pycon
->>> from failures import filtered
->>> handler_func = filtered(print, ValueError)
+>>> from failures import filtered, Reporter
 >>> # This filter will only handle failures with ValueError (or subclass) error instances
->>> handler_func2 = filtered(print, ValueError, TypeError)
+... handler_func = filtered(print, ValueError)
 >>> # This one will handle failures with errors either of TypeError or ValueError types
+... handler_func2 = filtered(print, ValueError, TypeError)
+>>> rep = Reporter("testing_filtered")
+>>> rep.report(Exception("generic error"))
+>>> rep.report(ValueError("value error"))
+>>> rep.report(TypeError("type error"))
+>>> for failure in rep.failures:
+...     handler_func(failure)
+...
+Failure(source='testing_filtered', error=ValueError('value error'), details={})
+>>> for failure in rep.failures:
+...     handler_func2(failure)
+...
+Failure(source='testing_filtered', error=ValueError('value error'), details={})
+Failure(source='testing_filtered', error=TypeError('type error'), details={})
 ````
 
 Or passing a filtered handler as tuple to the {class}`failures.Handler` constructor like this
 
 ````pycon
->>> from failures import Handler
+>>> from failures import Handler, Reporter
 >>> handler = Handler((print, ValueError))
->>> handler2 = Handler((print, ValueError, TypeError))
+>>> handler2 = Handler((print, (ValueError, TypeError)))
+>>>
+>>> rep = Reporter("testing_filtered")
+>>> rep.report(Exception("generic error"))
+>>> rep.report(ValueError("value error"))
+>>> rep.report(TypeError("type error"))
+>>> handler.from_reporter(rep)
+Failure(source='testing_filtered', error=ValueError('value error'), details={})
+>>> handler2.from_reporter(rep)
+Failure(source='testing_filtered', error=ValueError('value error'), details={})
+Failure(source='testing_filtered', error=TypeError('type error'), details={})
+>>>
+>>> with handler:  # Handles only ValueError
+...     with rep:
+...         raise TypeError("ignored")
+...
+
+>>> with handler2:  # Handles only ValueError
+...     with rep:
+...         raise TypeError("ignored")
+...
+Failure(source='testing_filtered', error=TypeError('ignored'), details={})
+````
+
+````{note}
+Note that unlike ``filtered()``, multiple filters are wrapped in a tuple when using ``Handler()``
 ````
 
 ### Filter by label
+We can handle a specific labeled failure by a custom handler, this is done by passing the handler together with a label
+to the {class}`failures.Handler` _(or {func}`failures.filtered`)_
 
+````pycon
+>>> from failures import Reporter, Handler
+>>> # Reporter tree
+>>> root = Reporter("root")
+>>> proc1 = root("process1")
+>>> proc2 = root("process2")
+>>> # Reporting errors
+>>> root.report(Exception("from root"))
+>>> proc1.report(Exception("from proc1"))
+>>> proc2.report(Exception("from proc2"))
+>>> # Checking reported
+>>> for _failure in root.failures:
+...     print(failure)
+...     
+Failure(source='root', error=Exception('from root'), details={})
+Failure(source='root.process1', error=Exception('from proc1'), details={})
+Failure(source='root.process2', error=Exception('from proc2'), details={})
+>>> def custom(failure):
+...     print(f"(*)custom failure => source: {failure.source}, error: {failure.error!r}")
+...
+>>> Handler((custom, "root.process1"), print).from_reporter(root)
+Failure(source='root', error=Exception('from root'), details={})
+(*)custom failure => source: root.process1, error: Exception('from proc1')
+Failure(source='root.process1', error=Exception('from proc1'), details={})
+Failure(source='root.process2', error=Exception('from proc2'), details={})
+````
 
-### Filter by label pattern
+As shown in this example, ``print()`` was called with all reported failures, but ``custom()`` was only called for
+the failure labeled exactly ``'root.process1'``. 
+This can be useful to control which function handles which failure, but implementing a handler to handle one single 
+failure is rarely the desired behaviour, we can target a group of labels using the wildcard symbol ``*``.
 
-TODO / Handling failures with a specific label pattern
+If we want to process all failures under ``'root'`` label but not ``'root'`` itself, we can filter by
+``"root.*"``
+
+````pycon
+...
+>>> Handler((custom, "root.*")).from_reporter(root)
+(*)custom failure => source: root.process1, error: Exception('from proc1')
+(*)custom failure => source: root.process2, error: Exception('from proc2')
+````
+
+The wildcard symbol ``*`` matches everything, it can be placed anywhere it's needed
+
+````pycon
+...
+>>> Handler((custom, "*process*")).from_reporter(root)
+(*)custom failure => source: root.process1, error: Exception('from proc1')
+(*)custom failure => source: root.process2, error: Exception('from proc2')
+````
+
+````{note}
+This ``Handler((handle, '*'))`` is the  same as this ``Handler(handle)``
+````
 
 ### Filter by error type
+Failures can be filtered by exception type, this is achieved by passing the exception type itself with the handler
 
-TODO / Handling failures from specific error type or types
+````pycon
+>>> from failures import Handler, Reporter
+>>> handler = Handler(
+...     ((lambda f: print(f"[handler 1] :: {f!r}")), (KeyError, IndexError)),
+...     ((lambda f: print(f"[handler 2] :: {f!r}")), (ValueError, TypeError)),
+... )
+>>> reporter = Reporter("filtering_by_exctype")
+>>> for ErrType in (KeyError, IndexError, ValueError, TypeError, NameError, RecursionError):
+...     reporter.report(ErrType("test err"))
+...
+>>> handler.from_reporter(reporter)
+[handler 1] :: Failure(source='filtering_by_exctype', error=KeyError('test err'), details={})
+[handler 1] :: Failure(source='filtering_by_exctype', error=IndexError('test err'), details={})
+[handler 2] :: Failure(source='filtering_by_exctype', error=ValueError('test err'), details={})
+[handler 2] :: Failure(source='filtering_by_exctype', error=TypeError('test err'), details={})
+````
+
+````{note}
+This ``Handler((handle, Exception))`` is the  same as this ``Handler(handle)``
+````
 
 ### Combining filters
+Filters can be as specific as we need them to be, we can combine multiple filters to match the specification, 
+and different types of filters can be combined too:
+
+Consider this list of failures
+
+````pycon
+>>> from failures import Handler, Failure
+>>> failures = [
+...     Failure("app.trigger", RuntimeError("..."), {}),
+...     Failure("client.data.download", TimeoutError("..."), {}),
+...     Failure("client.data.process.decode", ValueError("..."), {}),
+...     Failure("client.data.process.extract", KeyError("..."), {}),
+...     Failure("client.data.process.analyze", TypeError("..."), {}),
+...     Failure("client.data.store", IOError("..."), {}),
+...     Failure("app.notify", TypeError("..."), {}),
+... ]
+````
+
+
 
 TODO / filtering by any of multiple filters
 TODO / filtering by a combination of filters
@@ -134,4 +263,3 @@ TODO / combining filters with logical 'OR' and 'AND'
 
 ## Combining multiple handlers
 
-## Handling from reporter

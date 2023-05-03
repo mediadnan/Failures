@@ -20,14 +20,15 @@ else:
     )
 from typing_extensions import TypeAlias, Self
 
-from .core import Failure, FailureException, Reporter
+from .core import Failure, FailureException, Reporter, _invalid
 
 # Type aliases
 FailureFilter: TypeAlias = Callable[['Failure'], bool]
 FailureHandler: TypeAlias = Callable[['Failure'], None]
+HandlerOrHandlers = Union[FailureHandler, Tuple[FailureHandler, ...]]
 ExceptionTypes = Union[Type[Exception], Tuple[Type[Exception], ...]]
 SupportedFilters: TypeAlias = Union[str, Pattern[str], ExceptionTypes]
-Filters: TypeAlias = Union[SupportedFilters, Tuple[SupportedFilters, ...]]
+Filters: TypeAlias = Union[SupportedFilters, Tuple['Filters', ...], List['Filters']]
 
 
 def print_failure(failure: Failure, /) -> None:
@@ -86,8 +87,31 @@ def _match_all(_: Failure, /) -> Literal[True]:
     return True
 
 
-def _make_filter(spec: SupportedFilters) -> FailureFilter:
-    """Creates a filter from specification"""
+def _validate_handler(obj: FailureHandler) -> FailureHandler:
+    """Validates the failure handler function"""
+    if not callable(obj):
+        raise TypeError("the handler must be a callable with signature: (Failure) -> None")
+    return obj
+
+
+def filters(spec: Filters, /) ->FailureFilter:
+    """
+    Creates a failure filter function that takes a failure object
+    and returns True or False whether it matches the specification
+    or not.
+
+    :param spec: Either a single filter specifier or a combination list and/or tuple of filters.
+    :returns: A Filter function based on that specifier(s).
+    """
+    if isinstance(spec, (tuple, list)):
+        if not spec:
+            raise _invalid(TypeError, f"Cannot use an empty {type(spec).__name__} as failure specification")
+        _filters = list(map(filters, spec))
+        if len(_filters) == 1:
+            return _filters[0]
+        comb = any if isinstance(spec, list) else all
+        def check(failure: Failure) -> bool: return comb((_filter(failure) for _filter in _filters))
+        return check
     if spec == '*' or spec is Exception:
         return _match_all  # optimising match
     if isinstance(spec, str):
@@ -96,61 +120,40 @@ def _make_filter(spec: SupportedFilters) -> FailureFilter:
         return FailureLabelMatch(spec)
     if isinstance(spec, type) and issubclass(spec, Exception):
         return FailureExceptionMatch(spec)
-    raise TypeError(f"Unsupported filter type {type(spec).__name__!r}")
+    raise TypeError(f"Unsupported filter type {type(spec)!r}")
 
 
-if __debug__:
-    def _validate_handler(obj: FailureHandler) -> FailureHandler:
-        """Validates the failure handler function"""
-        if not callable(obj):
-            raise TypeError("the handler must be a callable with signature: (Failure) -> None")
-        return obj
-else:
-    def _validate_handler(obj: FailureHandler) -> FailureHandler:
-        return obj
+def filtered(handler: FailureHandler, condition: FailureFilter) -> FailureHandler:
+    """
+    Turns the failure handler function into a conditional handler
+    only applied to the failure if the condition is met.
 
+    :param handler: The function that handles the failure ``(failure) -> None``,
+    :param condition: The function that checks the failure ``(failure) -> bool``,
+    :returns: A function that calls the handler only if the condition returns True.
+    """
+    if condition is _match_all:
+        return handler
 
-def filtered(handler: FailureHandler, *filters: Filters) -> FailureHandler:
-    """Creates a conditional handler based on the specified filters"""
-    filters_: List[FailureFilter] = []
-    for filter_ in filters:
-        if isinstance(filter_, tuple):
-            _len = len(filter_)
-            if _len > 1:
-                fls = tuple(map(_make_filter, filter_))
-                filters_.append(lambda f: all((flt(f) for flt in fls)))
-                continue
-            elif _len == 1:
-                filter_ = filters[0]
-            else:
-                continue
-        filters_.append(_make_filter(filter_))
-    _len = len(filters_)
-    if _len > 1:
-        def condition(f: Failure) -> bool:
-            return any((flt(f) for flt in filters_))
-    elif _len == 1:
-        condition = filters_[0]
-    else:
-        raise ValueError("At least one filter is required")
-    handler = _validate_handler(handler)
-
-    def _handle(failure: Failure, /) -> None:
+    def _handler(failure: Failure) -> None:
         if condition(failure):
-            return handler(failure)
-    return _handle
+            handler(failure)
+    return _handler
 
 
-def combine(handler: FailureHandler, *handlers: FailureHandler) -> FailureHandler:
-    """Combines multiple handlers into a handler that calls them in the same order"""
-    if not handlers:
-        return _validate_handler(handler)
-
-    def _handle(failure: Failure, /) -> None:
-        for _handler in _handlers:
-            _handler(failure)
-    _handlers = list(map(_validate_handler, (handler, *handlers)))
-    return _handle
+def combine(handlers: Union[FailureHandler, Tuple[FailureHandler, ...]], /) -> FailureHandler:
+    """Merge all handlers into a single function that calls them the same order they were provided."""
+    if isinstance(handlers, tuple):
+        if not handlers:
+            raise _invalid(TypeError, "Cannot define an empty tuple as failure handler")
+        if len(handlers) > 1:
+            def handle(failure: Failure) -> None:
+                for handler in handlers:
+                    handler(failure)
+            handlers = tuple(map(_validate_handler, handlers))
+            return handle
+        handlers = handlers[0]
+    return _validate_handler(handlers)
 
 
 class Handler:
@@ -159,34 +162,38 @@ class Handler:
     together as a single failure handler, allowing the creation of complex
     failure handlers.
 
-    The handler is also a context manager, used with ``with`` statement,
+    The handler is also a context manager, used with the ``with`` statement,
     it captures and automatically handles any raised FailureException.
     """
     __slots__ = '__handler',
     __handler: FailureHandler
 
-    def __init__(self, *args: Union[FailureHandler, Tuple[FailureHandler, Filters, ...]]):
+    def __init__(self, *args: Union[HandlerOrHandlers, Tuple[HandlerOrHandlers, Filters]]):
         """
         The handler constructor optionally takes one or multiple failure handing functions
         (with signature (Failure)->None), the handlers also can be filtered to handle only
         a targeted group of failures.
 
         To pass a filtered handler, put it inside a tuple followed with one or multiple filter
-        like (func, filter1, filter2, ...), so func will be called only if the failure matches
+        like (func, (filter1, filter2, ...)), so func will be called only if the failure matches
         any of filter1, filter2, ...
 
         Filtered handlers can also be more specific by combining filters like (func, (f1, f2), f3, (f4, f5, f6)),
         so func will only handle failures that match the filters: (f1 AND f2) OR f3 OR (f4 AND f5 AND f6)
 
-        :param args: A sequence of either func, (func, filter, filter, ...) or (func, (filter, filter), (...), ...)
+        :param args: A sequence of either func, (func, (filter, filter, ...)) or (func, ((filter, filter), (...), ...))
         """
-        _handlers = [filtered(*arg) if isinstance(arg, tuple) else arg for arg in args]
-        if not _handlers:
-            self.__handler = print_failure
-        elif len(_handlers) == 1:
-            self.__handler = _handlers[0]
-        else:
-            self.__handler = combine(*_handlers)
+        _handlers = []
+        for arg in args:
+            if isinstance(arg, tuple):
+                try:
+                    _han, _fts = arg
+                except ValueError:
+                    raise _invalid(ValueError, "The tuple of filtered handler must contain exactly two elements;"
+                                               "(handler, filter) or (handler, (filter, filter, ...)")
+                arg = filtered(combine(_han), filters(_fts))
+            _handlers.append(arg)
+        self.__handler = combine(tuple(_handlers)) if _handlers else print_failure
 
     def __call__(self, failure: Failure, /) -> None:
         """Handles the failure by calling the internal handler"""
