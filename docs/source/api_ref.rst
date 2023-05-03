@@ -18,8 +18,4 @@ to switch between source code and documentation.
     :members:
     :special-members: __call__
 
-.. autofunction:: failures.filtered
-
-.. autofunction:: failures.combine
-
 .. autofunction:: failures.print_failure

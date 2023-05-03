@@ -1,5 +1,4 @@
 import re
-from types import TracebackType
 from functools import cached_property
 from typing import Optional, Type, List, Dict, Any, Callable, Awaitable, NamedTuple, TypeVar
 
@@ -192,12 +191,7 @@ class Reporter:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(
-            self,
-            _err_type: Type[BaseException] = None,
-            error: BaseException = None,
-            _err_tb: TracebackType = None
-    ) -> bool:
+    def __exit__(self, _err_type, error: BaseException, _err_tb) -> bool:
         if isinstance(error, Exception) and not _is_validation_error(error):
             raise FailureException(self.failure(error), self)
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)

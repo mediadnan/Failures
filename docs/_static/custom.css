@@ -1,0 +1,11 @@
+#title {
+    background-image: url("icon.svg");
+    background-size: 1em;
+    background-position: right;
+    background-repeat: no-repeat;
+    padding-right: 1.4em;
+}
+
+#sub-title {
+    color: #af3a4d;
+}

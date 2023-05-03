@@ -1,5 +1,5 @@
-# Failures
-_Successfully dealing with failures_
+# [Failures]{#title}
+[_Successfully dealing with failures_]{#sub-title}
 
 ## Introduction
 In most applications that interact with data (_inconsistent data in particular_) failures are one thing to expect,
@@ -14,7 +14,7 @@ bugs and issues, giving us traceback information about where that error happened
 However, in production environments, we rarely want our application to crash for every failure that occurs, 
 and we want it to be more robust against expected and unexpected failures.
 But on the other hand, silencing and ignoring all the failures is not a desired behavior either, 
-as it doesn't give us isight about what is happening in our application.
+as it doesn't give us insight about what is happening in our application.
 
 The solution is to catch and handle each exception when performing an operation that might fail,
 wrapping it within ``try-except`` block to catch and log that failure while providing and alternative result 
@@ -78,6 +78,7 @@ you can open an issue in the official [GitHub ``failures`` repository](https://g
     :maxdepth: 3
 guide/reporting
 guide/handling
+guide/conclusion
 ````
 ````{toctree}
     :hidden:
