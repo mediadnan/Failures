@@ -12,35 +12,37 @@
 </div>
 
 ## What is failures
-A simple library aiming to ease reporting and handling errors in applications,
-specially those dealing with inconsistent data and can fail in different parts of the code.
-Dealing with this kind of problem becomes tedious when trying to wrap multiple parts with ``try...except`` blocks
-and handling each one in place, or can add extra work when trying to implement a failure handling system
-for each different application.
+This library simplifies dealing with application failures especially when using multiple nested components
+that process some data and could fail at any point.
 
-A solution to that problem is labeling different parts of code with meaningful names, and gather all failures
-to be reported and handled at the end of each function call (session, path operation, *or whatever ...*).
+Often in production, the app must be robust enough against errors but still report them so we can improve it regularly,
+this requires us as developers to isolate those operations _(usually within ``try...except`` blocks)_ then catch
+any possible errors to report them and provide an alternative result _(like returning ``None``)_.
+This is an additional job to be done to keep achieve the production robustness.
 
-This library comes with those exact tools, objects that hold failures between functions,
-utilities to handle failures with a possibility to filter and handle failures differently, utilities to run a function
-in a safe context while reporting errors, uncoupled failure labeling, and so on...
+Meanwhile, this library suggests some tools to ease this process and divides it into two main phases, 
+the first is capturing failures through an application action and between function calls while giving them
+meaningful labels and optionally explicit metadata to help us understand them later and their context,
+the second phase is to process those collected failures with the ability to filter and choose different
+handling action for different type of failures.
+
+The library focuses on two main factors, simplicity and performance, by keeping the syntax easy, clean and intuitive
+for a better and more readable code, and by optimizing its code to minimize the impact on your application.
 
 ## Installation
-``failures`` is available at PyPI, and requires python 3.8 or higher,
-to install the latest release, run the ``pip`` command:
+``failures`` is available at PyPI, it requires python 3.8 or higher, to install it run the ``pip`` command:
 
 ```shell
 pip install failures
 ```
 
-### Note
-``failures`` comes with a default handler that just logs reported failures to the standard output,
-if you want those logs to be colored, you can install this library with ``colorama`` as optional
-dependency by running
-
-```shell
-pip install "failures[colors]"
-```
-
 ## Usage
-.. TODO
+This example will show the tip of the iceberg, for a more complete tutorial refer to the documentation
+page at [documentation page](https://failures.readthedocs.org).
+
+````python
+from failures import Reporter, Handler
+
+# TODO: example
+````
+
