@@ -1,4 +1,6 @@
-from typing import Type
+import asyncio
+from contextlib import nullcontext
+from typing import Type, Union
 
 import pytest
 from failures import Reporter, Failure, FailureException
@@ -166,3 +168,86 @@ def test_hybrid_bound_unbound_failure(error):
             error,
             dict(a=5, b=7, c=11)
         )
+
+
+INVALID_CONTAINER_ERROR = TypeError("Invalid container type")
+
+
+def populate(*args, cont: Union[list, dict], **kwargs) -> None:
+    if isinstance(cont, list):
+        return cont.extend(args)
+    elif isinstance(cont, dict):
+        return cont.update(kwargs)
+    raise INVALID_CONTAINER_ERROR
+
+
+async def populate_async(*args, cont: Union[list, dict], **kwargs) -> None:
+    await asyncio.sleep(0.1)
+    return populate(*args, cont=cont, **kwargs)
+
+
+def test_safe_context():
+    data_list = []
+    reporter = Reporter('rep', a=1)
+    reporter.safe(populate, cont=None)
+    reporter.safe(populate, 1, 2, 3, cont=data_list)
+    assert reporter.failures == [Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})], "Failure didn't get registered"
+    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
+
+
+@pytest.mark.asyncio
+async def test_async_safe_context():
+    data_list = []
+    reporter = Reporter('rep', a=1)
+    await asyncio.gather(
+        reporter.safe_async(populate_async, cont=None),
+        reporter.safe_async(populate_async, 1, 2, 3, cont=data_list)
+    )
+    assert reporter.failures == [Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})], "Failure didn't get registered"
+    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
+
+
+def test_optional_context():
+    data_list = []
+    reporter = Reporter('rep')
+    reporter.optional(populate, cont=None)
+    reporter.optional(populate, 1, 2, 3, cont=data_list)
+    assert reporter.failures == [], "Failure did get registered"
+    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
+
+
+@pytest.mark.asyncio
+async def test_async_optional_context():
+    data_list = []
+    reporter = Reporter('rep', a=1)
+    await asyncio.gather(
+        reporter.optional_async(populate_async, cont=None),
+        reporter.optional_async(populate_async, 1, 2, 3, cont=data_list)
+    )
+    assert reporter.failures == [], "Failure did get registered"
+    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
+
+
+def test_required_context():
+    data_list = []
+    try:
+        with Reporter('rep', a=1):
+            populate(1, 2, 3, cont=data_list)
+            populate(1, 2, 3, cont=None, something=123)
+            populate(5, 6, 7, cont=data_list)  # should never be reached
+    except FailureException as fe:
+        assert fe.failure == Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})
+    assert data_list == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_async_required_context():
+    data_list = []
+    try:
+        with Reporter('rep', a=1):
+            await populate_async(1, 2, 3, cont=data_list)
+            await populate_async(1, 2, 3, cont=None, something=123)
+            await populate_async(5, 6, 7, cont=data_list)  # should never be reached
+    except FailureException as fe:
+        assert fe.failure == Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})
+    assert data_list == [1, 2, 3]
