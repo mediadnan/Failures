@@ -6,7 +6,6 @@ from datetime import datetime
 try:
     import colorama
 except ImportError:
-    colorama = None
     _template = "[FAILURE] {source} :: {err_type}({error}) {time}"
 else:
     colorama.just_fix_windows_console()
