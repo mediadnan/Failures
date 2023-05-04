@@ -128,7 +128,7 @@ class Reporter:
     @property
     def parent(self) -> Optional['Reporter']:
         """Gets the reporter's parent if this was derived from one, or None instead"""
-        return
+        return None
 
     @property
     def root(self) -> 'Reporter':
@@ -191,60 +191,59 @@ class Reporter:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, _err_type, error: BaseException, _err_tb) -> bool:
+    def __exit__(self, _err_type, error: BaseException, _err_tb):
         if isinstance(error, Exception) and not _is_validation_error(error):
-            raise FailureException(self.failure(error), self)
+            raise FailureException(self.failure(error), self) from None
         # Avoid handling higher exceptions (like BaseException, KeyboardInterrupt, ...)
         # Or module validation errors that must be raised
-        return False
 
     def safe(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls func(\*args, \*\*kwargs) inside a safe block and returns its result if
+        Calls func with args and kwargs inside a safe block and returns its result if
         it succeeds, or returns None and report the failure otherwise.
         """
         try:
             return func(*args, **kwargs)
         except Exception as err:
             self.report(err)
-            return
+            return None
 
     async def safe_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls await func(\*args, \*\*kwargs) inside a safe block and returns its result if
+        Calls await func with args and kwargs inside a safe block and returns its result if
         it succeeds, or returns None and report the failure otherwise.
         """
         try:
             return await func(*args, **kwargs)
         except Exception as err:
             self.report(err)
-            return
+            return None
 
     @staticmethod
     def optional(func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls func(\*args, \*\*kwargs) inside a safe block and returns its result if
+        Calls func with args and kwargs inside a safe block and returns its result if
         it succeeds, or returns None and ignores the failure otherwise.
         """
         try:
             return func(*args, **kwargs)
         except Exception:
-            return
+            return None
 
     @staticmethod
     async def optional_async(func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> Optional[T]:
         """
-        Calls await func(\*args, \*\*kwargs) inside a safe block and returns its result if
+        Calls await func with args and kwargs inside a safe block and returns its result if
         it succeeds, or returns None and ignores the failure otherwise.
         """
         try:
             return await func(*args, **kwargs)
         except Exception:
-            return
+            return None
 
     def required(self, func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """
-        Calls func(\*args, \*\*kwargs) inside a safe block and returns its result if
+        Calls func with args and kwargs inside a safe block and returns its result if
         it succeeds, or raises a labeled failure otherwise.
         """
         with self:
@@ -252,7 +251,7 @@ class Reporter:
 
     async def required_async(self, func: Callable[P, Awaitable[T]], /, *args: P.args, **kwargs: P.kwargs) -> T:
         """
-        Calls await func(\*args, \*\*kwargs) inside a safe block and returns its result if
+        Calls await func with args and kwargs inside a safe block and returns its result if
         it succeeds, or raises a labeled failure otherwise.
         """
         with self:
