@@ -1,13 +1,13 @@
 import asyncio
-from contextlib import nullcontext
-from typing import Type, Union
+from typing import Union, Optional, Tuple, List
 
-import pytest
+from pytest import param, raises, mark
+
 from failures import Reporter, Failure, FailureException
-from failures.core import _invalid
+from failures.core import _invalid, ReporterChild
 
 
-@pytest.mark.parametrize("name", [
+@mark.parametrize("name", [
     "root", "root.sub", "root.sub_scope",
     "root.sub.sub.sub", "root.scope1",
     "scope2", "scope.iteration[5].func",
@@ -24,24 +24,29 @@ def test_reporter_valid_names(name: str):
     assert reporter.label == f"{name}.{name}"
 
 
-@pytest.mark.parametrize("name, error, message", [
-    pytest.param(object(), TypeError, "label must be a string", id="wrong_type_name"),
-    pytest.param(b'name.sub', TypeError, "label must be a string", id="wrong_type_name_bytes"),
-    pytest.param('', ValueError, "invalid label: ''", id="empty_name"),
-    pytest.param('name..sub', ValueError, "invalid label: 'name..sub'", id="double_dot"),
-    pytest.param('.name', ValueError, "invalid label", id="leading_dot"),
-    pytest.param('name.', ValueError, "invalid label", id="trailing_dot"),
+@mark.parametrize("name, catch_failure", [
+    param(object(), raises(TypeError), id="wrong_name_type"),
+    param(b'name.sub', raises(TypeError), id="wrong_type_name_bytes"),
+    param('', raises(ValueError), id="empty_name"),
+    param('name..sub', raises(ValueError), id="double_dot"),
+    param('.name', raises(ValueError), id="leading_dot"),
+    param('name.', raises(ValueError), id="trailing_dot"),
 ])
-def test_reporter_invalid_names(name: str, error: Type[Exception], message: str):
+def test_reporter_invalid_names(name: str, catch_failure):
     # Invalid for first reporter
-    with pytest.raises(error, match=message):
+    with catch_failure:
         Reporter(name)
     # Invalid for sub reporter
-    with pytest.raises(error, match=message):
+    with catch_failure:
         Reporter("rep")(name)
 
 
-@pytest.mark.parametrize("details", [{}, {'input': 27, 'desc': "cubic root evaluation"}], ids=str)
+def test_direct_reporter_child_creation():
+    with raises(TypeError):
+        ReporterChild("rep", None)  # type: ignore
+
+
+@mark.parametrize("details", [{}, {'input': 27, 'desc': "cubic root evaluation"}], ids=str)
 def test_reporter_creation(details):
     # Testing the first reporter
     reporter = Reporter("main", **details)
@@ -63,7 +68,7 @@ def test_reporter_creation(details):
     assert sub_reporter.root is reporter
     assert repr(sub_reporter) == "Reporter('main.sub')"
 
-    # Testing further reporter
+    # Testing a further reporter
     sub_sub_reporter = sub_reporter("leaf")
     assert sub_sub_reporter.name == "leaf"
     assert sub_sub_reporter.label == "main.sub.leaf"
@@ -93,6 +98,7 @@ def test_reporter_report():
 
 
 def test_reporter_context_manager_return():
+    """Test the returned value of the reporter as a context manager"""
     reporter = Reporter("ctx")
     with reporter as rep:
         pass
@@ -137,7 +143,7 @@ def test_report_context_manager_labeled_failure(error):
         )
 
 
-@pytest.mark.parametrize('err', [
+@mark.parametrize('err', [
     BaseException("test"),
     KeyboardInterrupt("test"),
     GeneratorExit("test"),
@@ -186,68 +192,52 @@ async def populate_async(*args, cont: Union[list, dict], **kwargs) -> None:
     return populate(*args, cont=cont, **kwargs)
 
 
-def test_safe_context():
-    data_list = []
-    reporter = Reporter('rep', a=1)
-    reporter.safe(populate, cont=None)
-    reporter.safe(populate, 1, 2, 3, cont=data_list)
-    assert reporter.failures == [Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})], "Failure didn't get registered"
-    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
-
-
-@pytest.mark.asyncio
-async def test_async_safe_context():
-    data_list = []
-    reporter = Reporter('rep', a=1)
-    await asyncio.gather(
-        reporter.safe_async(populate_async, cont=None),
-        reporter.safe_async(populate_async, 1, 2, 3, cont=data_list)
+@mark.parametrize("meth, expected, raised, reported", [
+    ("safe", ([1, 2], {'a': 'a', 'b': 'b'}), None, [Failure("rep", INVALID_CONTAINER_ERROR, {'desc': "details..."})]),
+    ("optional", ([1, 2], {'a': 'a', 'b': 'b'}), None, []),
+    ("required", ([1, 2], {}), Failure("rep", INVALID_CONTAINER_ERROR, {'desc': "details..."}), []),
+])
+def test_reporter_exec_ctx(meth: str, expected: Tuple[list, dict], raised: Optional[Failure], reported: List[Failure]):
+    data = (
+        [],  # inserted before failure
+        {},  # inserted after failure
     )
-    assert reporter.failures == [Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})], "Failure didn't get registered"
-    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
+    reporter = Reporter("rep", desc="details...")
+    method = getattr(reporter, meth)
+    _raised = None
+    try:
+        method(populate, 1, 2, cont=data[0], a='a', b='b')
+        method(populate, 1, 2, cont=None, a='a', b='b')
+        method(populate, 1, 2, cont=data[1], a='a', b='b')
+    except FailureException as fe:
+        assert raised == fe.failure
+    else:
+        assert raised is None
+    assert data == expected
+    assert reporter.failures == reported
 
 
-def test_optional_context():
-    data_list = []
-    reporter = Reporter('rep')
-    reporter.optional(populate, cont=None)
-    reporter.optional(populate, 1, 2, 3, cont=data_list)
-    assert reporter.failures == [], "Failure did get registered"
-    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
-
-
-@pytest.mark.asyncio
-async def test_async_optional_context():
-    data_list = []
-    reporter = Reporter('rep', a=1)
-    await asyncio.gather(
-        reporter.optional_async(populate_async, cont=None),
-        reporter.optional_async(populate_async, 1, 2, 3, cont=data_list)
+@mark.parametrize("meth, expected, raised, reported", [
+    ("safe_async", ([1, 2], {'a': 'a', 'b': 'b'}), None, [Failure("rep", INVALID_CONTAINER_ERROR, {'desc': "details"})]),
+    ("optional_async", ([1, 2], {'a': 'a', 'b': 'b'}), None, []),
+    ("required_async", ([1, 2], {}), Failure("rep", INVALID_CONTAINER_ERROR, {'desc': "details"}), []),
+])
+@mark.asyncio
+async def test_reporter_async_exec_ctx(meth: str, expected: Tuple[list, dict], raised: Optional[Failure], reported: List[Failure]):
+    data = (
+        [],  # inserted before failure
+        {},  # inserted after failure
     )
-    assert reporter.failures == [], "Failure did get registered"
-    assert data_list == [1, 2, 3], "Valid function didn't run after the invalid one"
-
-
-def test_required_context():
-    data_list = []
+    reporter = Reporter("rep", desc="details")
+    method = getattr(reporter, meth)
+    _raised = None
     try:
-        with Reporter('rep', a=1):
-            populate(1, 2, 3, cont=data_list)
-            populate(1, 2, 3, cont=None, something=123)
-            populate(5, 6, 7, cont=data_list)  # should never be reached
+        await method(populate_async, 1, 2, cont=data[0], a='a', b='b')
+        await method(populate_async, 1, 2, cont=None, a='a', b='b')
+        await method(populate_async, 1, 2, cont=data[1], a='a', b='b')
     except FailureException as fe:
-        assert fe.failure == Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})
-    assert data_list == [1, 2, 3]
-
-
-@pytest.mark.asyncio
-async def test_async_required_context():
-    data_list = []
-    try:
-        with Reporter('rep', a=1):
-            await populate_async(1, 2, 3, cont=data_list)
-            await populate_async(1, 2, 3, cont=None, something=123)
-            await populate_async(5, 6, 7, cont=data_list)  # should never be reached
-    except FailureException as fe:
-        assert fe.failure == Failure("rep", INVALID_CONTAINER_ERROR, {'a': 1})
-    assert data_list == [1, 2, 3]
+        assert raised == fe.failure
+    else:
+        assert raised is None
+    assert data == expected
+    assert reporter.failures == reported

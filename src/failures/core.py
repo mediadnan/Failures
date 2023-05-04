@@ -94,23 +94,19 @@ class Reporter:
     _details: Dict[str, Any]
     __failures: List[Failure]
 
-    if __debug__:
-        # Validation is only evaluated when run without the -O or -OO python flag
-        def __init__(self, name: str, /, **details) -> None:
-            """
-            :param name: The label for the current reporter (mandatory)
-            :param details: Additional details bound to the reporter
-            """
+    def __init__(self, name: str, /, **details) -> None:
+        """
+        :param name: The label for the current reporter (mandatory)
+        :param details: Additional details bound to the reporter
+        """
+        if __debug__:
+            # Validation is only evaluated when run without the -O or -OO python flag
             if not isinstance(name, str):
                 raise _invalid(TypeError, "label must be a string")
             elif not NamePattern.match(name):
                 raise _invalid(ValueError, f"invalid label: {name!r}")
-            self.__name = name
-            self._details = details
-    else:
-        def __init__(self, name: str, /, **details) -> None:
-            self.__name = name
-            self._details = details
+        self.__name = name
+        self._details = details
 
     def __call__(self, name: str, /, **details) -> 'ReporterChild':
         """
