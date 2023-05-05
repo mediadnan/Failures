@@ -188,7 +188,7 @@ def populate(*args, cont: Union[list, dict], **kwargs) -> None:
 
 
 async def populate_async(*args, cont: Union[list, dict], **kwargs) -> None:
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.001)
     return populate(*args, cont=cont, **kwargs)
 
 
