@@ -37,12 +37,57 @@ pip install failures
 ```
 
 ## Usage
-This example will show the tip of the iceberg, for a more complete tutorial refer to the documentation
-page at [documentation page](https://failures.readthedocs.org).
+This example will show the tip of the iceberg, for a more complete tutorial refer to the documentation page at
+[documentation page](https://failures.readthedocs.org).
+
+``failures`` contains two main objects, ``Reporter`` and ``Handler``, the first one gathers all failures and the second
+on processes them.
+
+Let's define some utilities for this example in a file named ``defs.py``
 
 ````python
-from failures import Reporter, Handler
+# defs.py
+import json
+from typing import Any
+from dataclasses import dataclass
+from failures import Reporter, Handler, Failure, scoped
 
-# TODO: example
+_database = {
+    '692999103396568d': b'{"name": "alertCheetah2", "email": "alertCheetah2@example.com", "phone": "(+212)645-882-425"}', 
+    'e2ddc4f976f8ccf8': b'{"name": "ardentJaguar0", "phone": "(+212)611-962-964"}',
+    'd097eba4d97a1ce0': b'{"name": "tautWeaver8", "email": "tautWeaver8@example.com", "phone": "(+212)683-480-745"}', 
+    'ef0eb816db00f939': b'{"name": "awedPolenta7", "email": "awedPolenta7@example.com", "phone": "(+212)641-014-059"}', 
+    'b54c8bea6badd65d': b'{"name": "dearCod2", "email": "dearCod2@example.com", "website": "www.dearCod2.example.com"}', 
+    'bad-8394313d4c44': b'{"name": "panickyViper9", "ema'
+}
+
+@dataclass
+class User:
+    id: str
+    name: str
+    email: str | None
+    phone: str | None
+
+def get_user(user_id: str) -> User:
+    reporter = Reporter('user')
+    with reporter('retrieve', id=user_id):
+        raw_json = _database[user_id]
+    with reporter('json_decode'):
+        user_data = json.loads(raw_json)
+    return convert(user_id, user_data, reporter)
+
+@scoped
+def convert(_id: str, _data: dict[str, Any], reporter: Reporter) -> User:
+    return User(
+        id=_id,
+        name=reporter.required(lambda: _data['name']),
+        email=reporter.safe(_data.__getitem__, 'email'),
+        phone=reporter.optional(_data.__getitem__, 'phone')
+    )
+
+def not_found_404(failure: Failure) -> None:
+    pass
+
+handler = Handler((not_found_404, "*.retrieve"), print, )
+
 ````
-
