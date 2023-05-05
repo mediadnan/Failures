@@ -11,10 +11,8 @@ Comparing the recursive reporter creation between modes running this code:
 >>> timeit(lambda: Reporter("name")("name")("name")("name"))
 ````
 
-Comparison
+Optimized mode compared to normal mode
 
-+--------------------+--------------------+--------------------+
-|     ``NORMAL``     |    ``OPTIMIZED``   |``DOUBLE_OPTIMIZED``|
-+--------------------+--------------------+--------------------+
-|       ``1``        |``0.44097825039613``|``0.43995090021065``|
-+--------------------+--------------------+--------------------+
+| ``NORMAL`` | ``OPTIMIZED`` | ``DOUBLE_OPTIMIZED`` |
+|:----------:|:-------------:|:--------------------:|
+|   ``1``    | ``0.440978``  |     ``0.439951``     |
