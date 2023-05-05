@@ -307,9 +307,27 @@ Failure(source='client.data.store', error=OSError('...'), details={})
 ````
 ``Not`` can take one or multiple conditions, like ``Not('client.*')`` or like the previous example,
 not that **multiple arguments are taken as a union**; so ``Not(ValueError, TypeError)`` is equivalent to 
-``not isinstance(err, (ValueError, TypeError))`` or more specifically ``not (isinstance(err, ValueError) or isinstance(err, TypeError))``.
+``not isinstance(err, (ValueError, TypeError))`` or more specifically 
+``not (isinstance(err, ValueError) or isinstance(err, TypeError))``, and it is the same as ``Not([ValueError, TypeError])``.
 
-TODO: intersection
+If you want to combine filters as interaction, you need to pass a tuple, like ``Not((ValueError, TypeError))``
+or ``(Not(ValueError), Not(TypeError))`` _(and it's recommended to use the first approach)_
+
+Adding to the next example, we can make a handler that handles al failures except those labeled 
+``client.*`` and have either value or type errors.
+
+````pycon
+... 
+>>> handler = Handler((print, Not(("client.*", [TypeError, ValueError]))))
+... for failure in failures:
+...     handler(failure)
+...     
+Failure(source='app.trigger', error=RuntimeError('...'), details={})
+Failure(source='client.data.download', error=TimeoutError('...'), details={})
+Failure(source='client.data.process.extract', error=KeyError('...'), details={})
+Failure(source='client.data.store', error=OSError('...'), details={})
+Failure(source='app.notify', error=TypeError('...'), details={})
+````
 
 ## Combining multiple handlers
 We've seen how to combine multiple handler functions when we create a {class}`failures.Handler` by

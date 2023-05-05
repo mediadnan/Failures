@@ -36,7 +36,7 @@ for a better and more readable code, and by optimizing its code to minimize the 
 pip install failures
 ```
 
-## Usage
+## Example
 This example will show the tip of the iceberg, for a more complete tutorial refer to the documentation page at
 [documentation page](https://failures.readthedocs.org).
 
@@ -46,18 +46,17 @@ on processes them.
 Let's define some utilities for this example in a file named ``defs.py``
 
 ````python
-# defs.py
 import json
-from typing import Any
+import logging
 from dataclasses import dataclass
-from failures import Reporter, Handler, Failure, scoped
+from failures import Reporter, Handler, Failure
 
 _database = {
-    '692999103396568d': b'{"name": "alertCheetah2", "email": "alertCheetah2@example.com", "phone": "(+212)645-882-425"}', 
+    '692999103396568d': b'{"name": "alertCheetah2", "email": "alertCheetah2@example.com", "phone": "(+212)645-882-425"}',
     'e2ddc4f976f8ccf8': b'{"name": "ardentJaguar0", "phone": "(+212)611-962-964"}',
-    'd097eba4d97a1ce0': b'{"name": "tautWeaver8", "email": "tautWeaver8@example.com", "phone": "(+212)683-480-745"}', 
-    'ef0eb816db00f939': b'{"name": "awedPolenta7", "email": "awedPolenta7@example.com", "phone": "(+212)641-014-059"}', 
-    'b54c8bea6badd65d': b'{"name": "dearCod2", "email": "dearCod2@example.com", "website": "www.dearCod2.example.com"}', 
+    'd097eba4d97a1ce0': b'{"name": "tautWeaver8", "email": "tautWeaver8@example.com", "phone": "(+212)683-480-745"}',
+    'ef0eb816db00f939': b'{"name": "awedPolenta7", "email": "awedPolenta7@example.com", "phone": "(+212)641-014-059"}',
+    'b54c8bea6badd65d': b'{"name": "dearCod2", "email": "dearCod2@example.com", "website": "www.dearCod2.example.com"}',
     'bad-8394313d4c44': b'{"name": "panickyViper9", "ema'
 }
 
@@ -68,26 +67,94 @@ class User:
     email: str | None
     phone: str | None
 
-def get_user(user_id: str) -> User:
-    reporter = Reporter('user')
-    with reporter('retrieve', id=user_id):
-        raw_json = _database[user_id]
-    with reporter('json_decode'):
-        user_data = json.loads(raw_json)
-    return convert(user_id, user_data, reporter)
-
-@scoped
-def convert(_id: str, _data: dict[str, Any], reporter: Reporter) -> User:
-    return User(
-        id=_id,
-        name=reporter.required(lambda: _data['name']),
-        email=reporter.safe(_data.__getitem__, 'email'),
-        phone=reporter.optional(_data.__getitem__, 'phone')
-    )
-
 def not_found_404(failure: Failure) -> None:
-    pass
+    try:
+        user_id = failure.details['id']
+    except KeyError:
+        return
+    logging.getLogger(failure.source).error(f"No user found with id = {user_id!r}", exc_info=failure.error)
 
-handler = Handler((not_found_404, "*.retrieve"), print, )
+handler = Handler((not_found_404, "*.retrieve"), print)
+
+def get_user(user_id: str) -> User | None:
+    reporter = Reporter('user')
+    with handler:
+        with reporter('retrieve', id=user_id):
+            raw_json = _database[user_id]
+        with reporter('json_decode'):
+            user_data = json.loads(raw_json)
+        rep_get = reporter('get', data=user_data)
+        user = User(
+            id=user_id,
+            name=rep_get('name').required(lambda: user_data['name']),
+            email=rep_get('email').safe(user_data.__getitem__, 'email'),
+            phone=rep_get('phone').optional(user_data.__getitem__, 'phone')
+        )
+        handler.from_reporter(reporter)
+        return user
+````
+
+### Code explained
+We declared a dummy data collection ``_database`` to act as a database, then we defined a data class ``User``
+to wrap user data.
+
+We define then a custom handler ``not_found_404`` to be called only when a user is not found, this handler takes
+a ``Failure`` object and returns nothing, all handlers should have this same signature.
+
+Then we create a ``Handler`` object used to handle application failures, we pass the custom handler under a condition
+``'*.retrieve'``, the condition means every label that ends with ``'retrieve'`` like in this case ``'user.retrieve'``. 
+
+After that we define our main action ``get_user(user_id: str) -> User | None`` that takes an id and returns a user if
+it exists, we evaluate all its instructions within the handler context to capture failures, then we create the root
+reporter labeled ``'user'``, all following operations will be labeled ``user.(somthing)``, then we try to retrieve
+a user by id ``_database[user_id]``, and as this might potentially fail, we execute it inside the reporter's context
+under the label ``retrieve``, this context is holding the ``user_id`` as additional detail.
+Using the reporter as context manager ``with reporter:`` ensures that the functions returns directly to the handler in 
+case of failure, the next code won't be executed.
+The same for the next instruction, we wrap it into a labeled scope ``json_decode`` to label it and mark it as required
+step.
+
+Then we create a ``User`` object, this time using inline reporter context, there is three; ``reporter.required(...)``
+for mandatory operations and it's the same as ``with reporter: ...``, it stops and returns to the handler in case 
+of failure, ``reporter.safe(...)`` does capture and keep the failure to be processed later and returns ``None`` as 
+alternative result, and ``reporter.optional(...)`` does the same but without reporting the failure.
+All the three expect a callable with or without parameters to be called so ``reporter.safe(func, 1, 2, a=3, b=4)``
+executes ``func(1, 2, a=3, b=4)`` in isolation.
+
+After that and finally we process those reported failures and return the result.
+
+### Usage
+Now let's jump into the interpreter and load our function and start calling it with different ids:
+
+````pycon
+>>> from defs import get_user
+>>> # Existing users
+>>> get_user('692999103396568d')
+User(id='692999103396568d', name='alertCheetah2', email='alertCheetah2@example.com', phone='(+212)645-882-425')
+
+>>> get_user('e2ddc4f976f8ccf8')  # Missing email reported and handled with print(failure)
+Failure(source='user.get.email', error=KeyError('email'), details={'data': {'name': 'ardentJaguar0', 'phone': '(+212)611-962-964'}})
+User(id='e2ddc4f976f8ccf8', name='ardentJaguar0', email=None, phone='(+212)611-962-964')
+
+>>> get_user('d097eba4d97a1ce0')
+User(id='d097eba4d97a1ce0', name='tautWeaver8', email='tautWeaver8@example.com', phone='(+212)683-480-745')
+
+>>> get_user('ef0eb816db00f939')
+User(id='ef0eb816db00f939', name='awedPolenta7', email='awedPolenta7@example.com', phone='(+212)641-014-059')
+
+>>> get_user('b54c8bea6badd65d')  # Missing phone number ignored
+User(id='b54c8bea6badd65d', name='dearCod2', email='dearCod2@example.com', phone=None)
+
+>>> # Bad json format
+>>> get_user('bad-8394313d4c44')  # returns None
+Failure(source='user.json_decode', error=JSONDecodeError('Unterminated string starting at: line 1 column 27 (char 26)'), details={})
+
+>>> # Non-existing users
+>>> get_user('random-id')
+ERROR:user.retrieve:No user found with id = 'random-id'
+Traceback (most recent call last):
+  File "/path/to/defs.py", line 35, in get_user
+KeyError: 'random-id'
+Failure(source='user.retrieve', error=KeyError('random-id'), details={'id': 'random-id'})
 
 ````
