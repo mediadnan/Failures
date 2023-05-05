@@ -26,7 +26,7 @@ FailureFilter: TypeAlias = Callable[['Failure'], bool]
 FailureHandler: TypeAlias = Callable[['Failure'], None]
 HandlerOrHandlers = Union[FailureHandler, Tuple[FailureHandler, ...]]
 ExceptionTypes = Union[Type[Exception], Tuple[Type[Exception], ...]]
-SupportedFilters: TypeAlias = Union[str, Pattern[str], ExceptionTypes]
+SupportedFilters: TypeAlias = Union[str, ExceptionTypes, 'FailureMatch']
 Filters: TypeAlias = Union[SupportedFilters, Tuple['Filters', ...], List['Filters']]
 
 
