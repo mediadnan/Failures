@@ -287,6 +287,30 @@ Failure(source='client.data.process.extract', error=KeyError('...'), details={})
 Failure(source='client.data.process.analyze', error=TypeError('...'), details={})
 ````
 
+### Exclusive filter
+In case we need to specify a handler that handles every failure except a specific type, we can use {class}`failures.Not`,
+it wraps a filter to inform the ``Handler`` that we mean the opposite.
+
+Continuing with the previous example, if we want to handle everything but failures with ``process`` label or 
+with ``TypeError`` errors, we can do this like the following
+
+````pycon
+... 
+>>> from failures import Not
+>>> handler = Handler((print, Not("*.process*", TypeError)))
+>>> for failure in failures:
+...     handler(failure)
+...
+Failure(source='app.trigger', error=RuntimeError('...'), details={})
+Failure(source='client.data.download', error=TimeoutError('...'), details={})
+Failure(source='client.data.store', error=OSError('...'), details={})
+````
+``Not`` can take one or multiple conditions, like ``Not('client.*')`` or like the previous example,
+not that **multiple arguments are taken as a union**; so ``Not(ValueError, TypeError)`` is equivalent to 
+``not isinstance(err, (ValueError, TypeError))`` or more specifically ``not (isinstance(err, ValueError) or isinstance(err, TypeError))``.
+
+TODO: intersection
+
 ## Combining multiple handlers
 We've seen how to combine multiple handler functions when we create a {class}`failures.Handler` by
 placing them as positional arguments like ``Handler(func1, func2, ...)``, but what if we want to combine

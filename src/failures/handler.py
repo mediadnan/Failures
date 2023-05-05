@@ -102,6 +102,9 @@ def filters(spec: Filters, /) ->FailureFilter:
     :param spec: Either a single filter specifier or a combination list and/or tuple of filters.
     :returns: A Filter function based on that specifier(s).
     """
+    if isinstance(spec, FailureMatch) or spec is _match_all:
+        # for prepared filters
+        return spec
     if isinstance(spec, (tuple, list)):
         if not spec:
             raise _invalid(TypeError, f"Cannot use an empty {type(spec).__name__} as failure specification")
@@ -120,6 +123,29 @@ def filters(spec: Filters, /) ->FailureFilter:
     if isinstance(spec, type) and issubclass(spec, Exception):
         return FailureExceptionMatch(spec)
     raise TypeError(f"Unsupported filter type {type(spec)!r}")
+
+
+class Not(FailureMatch):
+    """
+    Matches the opposite of the specified filters,
+    like ``Not(ValueError)`` matches every failure
+    but ``ValueError``.
+
+    If we want to avoid multiple failures, we can pass
+    multiple filters, like ``Not(TypeError, ValueError)``
+    this is like writing ``not isinstance(error, (TypeError, ValueError))``.
+    """
+    __slots__ = '_filter',
+
+    def __init__(self, *spec: Filters) -> None:
+        self._filter: FailureFilter = filters(
+            spec[0]   # In case the user passes a prepared filter
+            if len(spec) == 1 else
+            list(spec)
+        )
+
+    def __call__(self, failure: Failure, /) -> bool:
+        return not self._filter(failure)
 
 
 def filtered(handler: FailureHandler, condition: FailureFilter) -> FailureHandler:
@@ -167,7 +193,7 @@ class Handler:
     __slots__ = '__handler',
     __handler: FailureHandler
 
-    def __init__(self, *args: Union[HandlerOrHandlers, Tuple[HandlerOrHandlers, Filters]]):
+    def __init__(self, *args: Union[FailureHandler, Tuple[HandlerOrHandlers, Filters]]):
         """
         The handler constructor optionally takes one or multiple failure handing functions
         (with signature (Failure)->None), the handlers also can be filtered to handle only
@@ -189,7 +215,8 @@ class Handler:
                     _han, _fts = arg
                 except ValueError:
                     raise _invalid(ValueError, "The tuple of filtered handler must contain exactly two elements;"
-                                               "(handler, filter) or (handler, (filter, filter, ...)")
+                                               "(handler, filter) or (handler, (filter, filter, ...) "
+                                               "or ((handler1, handler2, ...), filter)")
                 arg = filtered(combine(_han), filters(_fts))
             _handlers.append(arg)
         self.__handler = combine(tuple(_handlers)) if _handlers else print_failure
