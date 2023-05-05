@@ -140,21 +140,26 @@ def scoped(arg=None, /):
     def decorator(func_: Callable[P, T], /, name: str = None) -> Callable[P, T]:
         _get, _set = _get_set_reporter_from_signature(func_)
         name_ = name or get_func_name(func_)
+
+        def get_reporter(args, kwargs) -> Reporter:
+            reporter = _get(args, kwargs)
+            if reporter is None:
+                reporter = Reporter
+            elif not isinstance(reporter, Reporter):
+                raise _invalid(TypeError, f"The reporter got wrong type {type(reporter)!r}")
+            return reporter(name_)
+
         if is_async(func_):
             @functools.wraps(func_)
             async def wrap(*args: P.args, **kwargs: P.kwargs) -> T:
-                reporter = (_get(args, kwargs) or Reporter)(name_)
-                if not isinstance(reporter, Reporter) or reporter is None:
-                    raise _invalid(TypeError, f"The reporter got wrong type {type(reporter)!r}")
+                reporter = get_reporter(args, kwargs)
                 _args, _kwargs = _set(args, kwargs, reporter)
                 with reporter:
                     return await cast(Callable[P, Awaitable[T]], func_)(*_args, **_kwargs)
         else:
             @functools.wraps(func_)
             def wrap(*args: P.args, **kwargs: P.kwargs) -> T:
-                reporter = (_get(args, kwargs) or Reporter)(name_)
-                if not isinstance(reporter, Reporter) or reporter is None:
-                    raise _invalid(TypeError, f"The reporter got wrong type {type(reporter)!r}")
+                reporter = get_reporter(args, kwargs)
                 _args, _kwargs = _set(args, kwargs, reporter)
                 with reporter:
                     return func_(*_args, **_kwargs)
@@ -166,4 +171,4 @@ def scoped(arg=None, /):
         return decorator(arg)
     elif isinstance(arg, str):  # In case it was called with a name @scope("name")
         return lambda func: decorator(func, arg)
-    raise TypeError("@scoped decorator expects a callable as first argument")
+    raise _invalid(TypeError, "@scoped decorator expects a callable as first argument")

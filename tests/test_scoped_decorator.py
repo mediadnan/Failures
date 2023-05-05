@@ -2,7 +2,7 @@ from functools import partial
 from typing import Optional
 
 from pytest import mark, fixture, raises
-from failures import scoped, FailureException, Reporter, Failure
+from failures import scoped, FailureException, Reporter, Failure    # noqa: F401, (scoped needed for eval(...))
 
 ERROR = Exception("test error")
 
@@ -21,27 +21,27 @@ partially_initialized_function = partial(func_with_params, 5, _param='five')
 
 
 def func_with_opt_arg_reporter(_arg=None, reporter=None):
-    (reporter or Reporter)("sub").report(ERROR)
+    reporter("sub").report(ERROR)
     raise ERROR
 
 
 def func_with_opt_kwarg_reporter(*_args, reporter=None):
-    (reporter or Reporter)("sub").report(ERROR)
+    reporter("sub").report(ERROR)
     raise ERROR
 
 
 def func_with_opt_kwarg_reporter_ann(*_args, rep: Reporter = None):
-    (rep or Reporter)("sub").report(ERROR)
+    rep("sub").report(ERROR)
     raise ERROR
 
 
 def func_with_opt_kwarg_reporter_ann_name(*_args, reporter: Reporter = None):
-    (reporter or Reporter)("sub").report(ERROR)
+    reporter("sub").report(ERROR)
     raise ERROR
 
 
 def func_with_opt_kwarg_reporter_ann_optional(*_args, reporter: Optional[Reporter] = None):
-    (reporter or Reporter)("sub").report(ERROR)
+    reporter("sub").report(ERROR)
     raise ERROR
 
 
@@ -64,17 +64,17 @@ def func_with_req_kwarg_reporter(*_args, reporter):
 
 
 def func_with_req_arg_reporter_ann(rep: Reporter, *_args):
-    (rep or Reporter)("sub").report(ERROR)
+    rep("sub").report(ERROR)
     raise ERROR
 
 
 def func_with_opt_arg_reporter_ann_name(reporter: Reporter = None, *_args):
-    (reporter or Reporter)("sub").report(ERROR)
+    reporter("sub").report(ERROR)
     raise ERROR
 
 
 def func_with_opt_arg_reporter_ann_optional(reporter: Optional[Reporter] = None, *_args):
-    (reporter or Reporter)("sub").report(ERROR)
+    reporter("sub").report(ERROR)
     raise ERROR
 
 
@@ -118,7 +118,7 @@ def func_with_opt_arg_reporter_def_excluded(reporter: Reporter = (), *_args):
     (func_with_opt_arg_reporter_ann_excluded, "func_with_opt_arg_reporter_ann_excluded", "(reporter,)", "{}", False),
     (func_with_opt_arg_reporter_def_excluded, "func_with_opt_arg_reporter_def_excluded", "(reporter,)", "{}", False),
 ])
-def test_decorator_no_params_func_no_rep(reporter, decorator, name, func, func_name, args, kwargs, bound):
+def test_scoped_decorator_variations(reporter, decorator, name, func, func_name, args, kwargs, bound):
     func = eval(decorator)(func)
     if name is None:
         name = func_name
@@ -139,3 +139,81 @@ def test_decorator_no_params_func_no_rep(reporter, decorator, name, func, func_n
 def test_invalid_type_decoration(code: str):
     with raises(TypeError):
         eval(code)
+
+
+async def async_func_without_params(): raise ERROR
+async def async_func_with_req_pos_param(arg): raise ERROR
+async def async_func_with_req_kw_param(arg=None, *, kwarg): raise ERROR
+async def async_func_with_req_pos_kw_params(*args, **kwargs): raise ERROR
+
+
+async def async_func_with_pos_req_rep(reporter=None, *args):
+    reporter('sub').report(ERROR)
+    raise ERROR
+
+
+async def async_func_with_pos_req_rep_ann(rep: Reporter = None, *args):
+    rep('sub').report(ERROR)
+    raise ERROR
+
+
+async def async_func_with_kw_req_rep(*args, reporter=None):
+    reporter('sub').report(ERROR)
+    raise ERROR
+
+
+async def async_func_with_kw_req_rep_ann(*args, rep: Reporter = None):
+    rep('sub').report(ERROR)
+    raise ERROR
+
+
+@mark.parametrize("func, args, kwargs, bound", [
+    (async_func_without_params, "()", "{}", False),
+    (async_func_with_req_pos_param, "(None,)", "{}", False),
+    (async_func_with_req_kw_param, "()", "{'kwarg': None,}", False),
+    (async_func_with_req_pos_kw_params, "()", "{}", False),
+    (async_func_with_req_pos_kw_params, "(1, 2, 3)", "{'a': 1, 'b': 2}", False),
+    (async_func_with_pos_req_rep, "()", "{}", False),
+    (async_func_with_pos_req_rep, "(reporter,)", "{}", True),
+    (async_func_with_pos_req_rep_ann, "()", "{}", False),
+    (async_func_with_pos_req_rep_ann, "(reporter,)", "{}", True),
+    (async_func_with_kw_req_rep, "()", "{}", False),
+    (async_func_with_kw_req_rep, "()", "{'reporter': reporter,}", True),
+    (async_func_with_kw_req_rep_ann, "()", "{}", False),
+    (async_func_with_kw_req_rep_ann, "()", "{'rep': reporter,}", True),
+])
+@mark.asyncio
+async def test_scoped_async_support(func, args, kwargs, bound, reporter):
+    func = scoped(func)
+    try:
+        await func(*eval(args), **eval(kwargs))
+    except FailureException as fe:
+        assert fe.failure.error is ERROR
+    assert ([f.error for f in reporter.failures] == [ERROR]) is bound
+
+
+@mark.parametrize("func, args, kwargs", [
+    (func_with_req_arg_reporter, "(None,)", "{}"),
+    (func_with_req_kwarg_reporter, "()", "{}"),
+    (func_with_req_arg_reporter_ann, "()", "{}"),
+])
+def test_required_but_unavailable_reporter(func, args, kwargs):
+    func = scoped(func)
+    _reporter = object()
+    with raises(TypeError, match=r"is missing the reporter as required \w+ argument"):
+        func(*eval(args), **eval(kwargs))
+
+
+@mark.parametrize("func, args, kwargs", [
+    (func_with_req_arg_reporter, "(None, _reporter, None)", "{}"),
+    (func_with_opt_kwarg_reporter_ann, "()", "{'rep': _reporter}"),
+    (func_with_opt_kwarg_reporter_ann_name, "()", "{'reporter': _reporter}"),
+    (func_with_opt_arg_reporter_ann_name, "(_reporter,)", "{}"),
+    (func_with_req_kwarg_reporter, "()", "{'reporter': _reporter}"),
+    (func_with_req_arg_reporter_ann, "(_reporter,)", "{}"),
+])
+def test_wrong_type_reporter(func, args, kwargs):
+    func = scoped(func)
+    _reporter = object()
+    with raises(TypeError, match=r"The reporter got wrong type .*"):
+        func(*eval(args), **eval(kwargs))
