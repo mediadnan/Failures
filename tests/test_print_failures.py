@@ -4,31 +4,25 @@ import importlib
 from unittest.mock import patch
 import pytest
 
-import failures
+from failures import print_failure, Failure
 
 
-def test_print_failure(capsys):
-    failures.print_failure("root.target", ValueError("test error"))
-    assert re.match(r".*\[FAILURE].*root\.target.*::.*ValueError\(.*test error.*\).*\d{4}-\d\d-\d\d \d\d:\d\d:\d\d.*",
+@pytest.fixture
+def failure(error):
+    return Failure("root.target", error, {})
+
+
+def test_print_failure(capsys, failure):
+    print_failure(failure)
+    assert re.match(r".*\[FAILURE].*root\.target.*::.*Exception\(.*Test error.*\).*\d{4}-\d\d-\d\d \d\d:\d\d:\d\d.*",
                     capsys.readouterr().out)
 
 
-def test_print_failure_without_colorama(capsys):
+def test_print_failure_without_colorama(capsys, failure):
+    import failures
     with patch.dict(sys.modules, {'colorama': None}):
-        importlib.reload(failures._print)
-        failures.print_failure("root.target", ValueError("test error"))
-        assert re.match(r"\[FAILURE] root\.target :: ValueError\(test error\) \d{4}-\d\d-\d\d \d\d:\d\d:\d\d",
+        importlib.reload(failures.handler)
+        failures.print_failure(failure)
+        assert re.match(r"\[FAILURE] root\.target :: Exception\(Test error\) \d{4}-\d\d-\d\d \d\d:\d\d:\d\d",
                         capsys.readouterr().out)
-    importlib.reload(failures._print)
-
-
-@pytest.mark.parametrize("context", ["failures.handle('test')", "failures.scope('test', failures.print_failure)"])
-def test_integration_with_failures(capsys, context):
-    # ensures compatibility with v0.1
-    with eval(context):
-        with failures.scope("sub"):
-            raise Exception("test error")
-    assert re.match(
-        r".*\[FAILURE].*test\.sub.*::.*Exception\(.*test error.*\).*\d{4}-\d\d-\d\d \d\d:\d\d:\d\d.*",
-        capsys.readouterr().out
-    )
+    importlib.reload(failures.handler)

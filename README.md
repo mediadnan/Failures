@@ -1,6 +1,6 @@
 <div id="readme_header" style="text-align: center">
 <h1 style="color: #913946ff; font-family: Candara, sans-serif;">Failures</h1>
-<p style="color: #bf6572; font-family: Candara, sans-serif; font-style: italic">Labeling failures for humans</p>
+<p style="color: #bf6572; font-family: Candara, sans-serif; font-style: italic">Successfully dealing with failures</p>
 <br/>
 <a href="https://github.com/mediadnan/Failures/actions/workflows/tests.yml" target="_blank"><img src="https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg" alt="Tests"/></a>
 <a href="https://codecov.io/gh/mediadnan/Failures" target="_blank"><img src="https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME" alt="CodeCov"/></a>
@@ -12,153 +12,149 @@
 </div>
 
 ## What is failures
-Failures is a python3 package that provides utilities to explicitly label nested
-failures _(errors)_ with simple syntax, and gives better flexibility on what errors
-to handle and how to handle them.
+This library simplifies dealing with application failures especially when using multiple nested components
+that process some data and could fail at any point.
+
+Often in production, the app must be robust enough against errors but still report them so we can improve it regularly,
+this requires us as developers to isolate those operations _(usually within ``try...except`` blocks)_ then catch
+any possible errors to report them and provide an alternative result _(like returning ``None``)_.
+This is an additional job to be done to keep achieve the production robustness.
+
+Meanwhile, this library suggests some tools to ease this process and divides it into two main phases, 
+the first is capturing failures through an application action and between function calls while giving them
+meaningful labels and optionally explicit metadata to help us understand them later and their context,
+the second phase is to process those collected failures with the ability to filter and choose different
+handling action for different type of failures.
+
+The library focuses on two main factors, simplicity and performance, by keeping the syntax easy, clean and intuitive
+for a better and more readable code, and by optimizing its code to minimize the impact on your application.
 
 ## Installation
-``failures`` is available at PyPI, and requires python 3.8 or higher,
-install it by executing the pip command:
+``failures`` is available at PyPI, it requires python 3.8 or higher, to install it run the ``pip`` command:
 
 ```shell
 pip install failures
 ```
 
-> **Note**
-> This package comes with a default handler that prints failures to the standard output,
-> if you want them to be highlighted with colors, you can install ``pip install "failures[colors]"``
+## Example
+This example will show the tip of the iceberg, for a more complete tutorial refer to the documentation page at
+[documentation page](https://failures.readthedocs.org).
 
-## Usage
-### Failures scope _(context)_ 
-This example will showcase the use of ``failure.scope`` to create a labeled failures scope and handle them
-in the outermost ``Scope`` layer.
+``failures`` contains two main objects, ``Reporter`` and ``Handler``, the first one gathers all failures and the second
+on processes them.
 
-Let's create a file ``example.py``
+Let's define some utilities for this example in a file named ``defs.py``
+
 ````python
-import math
-import failures
+import json
+import logging
+from dataclasses import dataclass
+from failures import Reporter, Handler, Failure
 
+_database = {
+    '692999103396568d': b'{"name": "alertCheetah2", "email": "alertCheetah2@example.com", "phone": "(+212)645-882-425"}',
+    'e2ddc4f976f8ccf8': b'{"name": "ardentJaguar0", "phone": "(+212)611-962-964"}',
+    'd097eba4d97a1ce0': b'{"name": "tautWeaver8", "email": "tautWeaver8@example.com", "phone": "(+212)683-480-745"}',
+    'ef0eb816db00f939': b'{"name": "awedPolenta7", "email": "awedPolenta7@example.com", "phone": "(+212)641-014-059"}',
+    'b54c8bea6badd65d': b'{"name": "dearCod2", "email": "dearCod2@example.com", "website": "www.dearCod2.example.com"}',
+    'bad-8394313d4c44': b'{"name": "panickyViper9", "ema'
+}
 
-def data_num_inverse_sqrt(data: dict) -> float:
-    with failures.scope("number", show_failure):
-        with failures.scope("extract"):
-            num = data["num"]  # fails if 'num' not in data or data is not a dict (1)
-        with failures.scope("convert"):
-            num = int(num)  # fails if num is not a sequence of digits (2)
-        with failures.scope("evaluate"):
-            return inverse_sqrt(num)
+@dataclass
+class User:
+    id: str
+    name: str
+    email: str | None
+    phone: str | None
 
+def not_found_404(failure: Failure) -> None:
+    try:
+        user_id = failure.details['id']
+    except KeyError:
+        return
+    logging.getLogger(failure.source).error(f"No user found with id = {user_id!r}", exc_info=failure.error)
 
-def inverse_sqrt(num: int) -> float:
-    # independent (decoupled) function
-    with failures.scope("inverse"):
-        num = 1 / num  # fails if num == 0 (3)
-    with failures.scope("square_root"):
-        return round(math.sqrt(num), 2)  # fails if num < 0 (4)
+handler = Handler((not_found_404, "*.retrieve"), print)
 
-
-def show_failure(label: str, error: Exception) -> None:
-    # This function will serve as a failure handler
-    # and will simply print the source and the error
-    print(f"[{label}] {error!r}")
-
+def get_user(user_id: str) -> User | None:
+    reporter = Reporter('user')
+    with handler:
+        with reporter('retrieve', id=user_id):
+            raw_json = _database[user_id]
+        with reporter('json_decode'):
+            user_data = json.loads(raw_json)
+        rep_get = reporter('get', data=user_data)
+        user = User(
+            id=user_id,
+            name=rep_get('name').required(lambda: user_data['name']),
+            email=rep_get('email').safe(user_data.__getitem__, 'email'),
+            phone=rep_get('phone').optional(user_data.__getitem__, 'phone')
+        )
+        handler.from_reporter(reporter)
+        return user
 ````
-The code is self-explanatory, ``data_num_inverse_sqrt`` function is the outer layer function that expects
-exactly a ``dict`` _(or a map-like object)_ that has a non-null positive number exactly with the key ``'num'``,
-this function also uses an independent function ``inverse_sqrt`` that might also fail,
-and finally we implement our own simple function for handling failures ``show_failure``.
+
+### Code explained
+We declared a dummy data collection ``_database`` to act as a database, then we defined a data class ``User``
+to wrap user data.
+
+We define then a custom handler ``not_found_404`` to be called only when a user is not found, this handler takes
+a ``Failure`` object and returns nothing, all handlers should have this same signature.
+
+Then we create a ``Handler`` object used to handle application failures, we pass the custom handler under a condition
+``'*.retrieve'``, the condition means every label that ends with ``'retrieve'`` like in this case ``'user.retrieve'``. 
+
+After that we define our main action ``get_user(user_id: str) -> User | None`` that takes an id and returns a user if
+it exists, we evaluate all its instructions within the handler context to capture failures, then we create the root
+reporter labeled ``'user'``, all following operations will be labeled ``user.(somthing)``, then we try to retrieve
+a user by id ``_database[user_id]``, and as this might potentially fail, we execute it inside the reporter's context
+under the label ``retrieve``, this context is holding the ``user_id`` as additional detail.
+Using the reporter as context manager ``with reporter:`` ensures that the functions returns directly to the handler in 
+case of failure, the next code won't be executed.
+The same for the next instruction, we wrap it into a labeled scope ``json_decode`` to label it and mark it as required
+step.
+
+Then we create a ``User`` object, this time using inline reporter context, there is three; ``reporter.required(...)``
+for mandatory operations and it's the same as ``with reporter: ...``, it stops and returns to the handler in case 
+of failure, ``reporter.safe(...)`` does capture and keep the failure to be processed later and returns ``None`` as 
+alternative result, and ``reporter.optional(...)`` does the same but without reporting the failure.
+All the three expect a callable with or without parameters to be called so ``reporter.safe(func, 1, 2, a=3, b=4)``
+executes ``func(1, 2, a=3, b=4)`` in isolation.
+
+After that and finally we process those reported failures and return the result.
+
+### Usage
+Now let's jump into the interpreter and load our function and start calling it with different ids:
 
 ````pycon
->>> from example import data_num_inverse_sqrt
->>> data_num_inverse_sqrt(5)  # (1)
-[number.extract] TypeError("'int' object is not subscriptable")
+>>> from defs import get_user
+>>> # Existing users
+>>> get_user('692999103396568d')
+User(id='692999103396568d', name='alertCheetah2', email='alertCheetah2@example.com', phone='(+212)645-882-425')
 
->>> data_num_inverse_sqrt({'my_num': 5})  # (1)
-[number.extract] KeyError('num')
+>>> get_user('e2ddc4f976f8ccf8')  # Missing email reported and handled with print(failure)
+Failure(source='user.get.email', error=KeyError('email'), details={'data': {'name': 'ardentJaguar0', 'phone': '(+212)611-962-964'}})
+User(id='e2ddc4f976f8ccf8', name='ardentJaguar0', email=None, phone='(+212)611-962-964')
 
->>> data_num_inverse_sqrt({"num": "two"})  # (2)
-[number.convert] ValueError("invalid literal for int() with base 10: 'two'")
+>>> get_user('d097eba4d97a1ce0')
+User(id='d097eba4d97a1ce0', name='tautWeaver8', email='tautWeaver8@example.com', phone='(+212)683-480-745')
 
->>> data_num_inverse_sqrt({"num": "0"})  # (3)
-[number.evaluate.inverse] ZeroDivisionError('division by zero')
+>>> get_user('ef0eb816db00f939')
+User(id='ef0eb816db00f939', name='awedPolenta7', email='awedPolenta7@example.com', phone='(+212)641-014-059')
 
->>> data_num_inverse_sqrt({"num": "-5"})  # (4)
-[number.evaluate.square_root] ValueError('math domain error')
+>>> get_user('b54c8bea6badd65d')  # Missing phone number ignored
+User(id='b54c8bea6badd65d', name='dearCod2', email='dearCod2@example.com', phone=None)
 
->>> data_num_inverse_sqrt({"num": "4"})  # No errors
-0.5
+>>> # Bad json format
+>>> get_user('bad-8394313d4c44')  # returns None
+Failure(source='user.json_decode', error=JSONDecodeError('Unterminated string starting at: line 1 column 27 (char 26)'), details={})
 
->>> data_num_inverse_sqrt({"num": 4}) # same, no errors
-0.5
-````
-Each scoped context captures any raised exception withing its scope and tag it with its label,
-then either handles it if a handler function was passed to it or re-raise it to the outer layer
-scope, each failures' scope captures a tagged and prepends its label until reaching the top level one. 
-
-### Failures scoped _(decorator)_
-The ``failures.scoped`` decorator is used to wrap a function within a labeled
-scope to reduce indentation and redundancy.
-
-Sot this function
-````python
-def number_processing(number):
-    with failures.scope("number_processing"):   # label same as function name
-        with failures.scope("step1"):
-            ...
-        with failures.scope("step2"):
-            ...
-````
-can be replaced by
-````python
-@failures.scoped
-def number_processing(number):
-    with failures.scope("step1"):
-        ...
-    with failures.scope("step2"):
-        ...
-````
-The decorator can also take optional parameters to customize the ``Scope`` object wrapping the function
-````python
-def number_processing(number):
-    with failures.scope("processing", show_failure):
-        with failures.scope("step1"):
-            ...
-        with failures.scope("step2"):
-            ...
-````
-can be replaced by
-````python
-@failures.scoped(name="processing", handler=show_failure)
-def number_processing(number):
-    with failures.scope("step1"):
-        ...
-    with failures.scope("step2"):
-        ...
-````
-
-### Failures handler
-The ``failures.handler`` utility creates a custom failure handler with additional filters,
-this function takes one required positional-only argument for the actual failure handling function,
-and two optional keyword-only argument, ``ignore`` to mark failures that should be ignored _(suppressed)_,
-and ``propagate`` to mark failures that shouldn't be captured _(unhandled)_.
-
-``ignore`` and ``propagate`` can take an exception type _(like ``ValueError``)_, or a tuple of
-exception types.
-
-````pycon
->>> from failures import scope, handler
->>> from example import show_failure
->>> def my_function(error: Exception):
-...     with scope('test_handler', handler(show_failure, ignore=KeyError, propagate=TypeError)):
-...         raise error
-...
-
->>> my_function(ValueError("value error"))  # Handled
-[test_handler] ValueError('value error')
->>> my_function(TypeError("value error"))  # Unhandled
+>>> # Non-existing users
+>>> get_user('random-id')
+ERROR:user.retrieve:No user found with id = 'random-id'
 Traceback (most recent call last):
-    ...
-failures.core.Failure: ('test_handler', TypeError('value error'))
->>> my_function(TypeError("type error"))  # Ignored
->>>
+  File "/path/to/defs.py", line 35, in get_user
+KeyError: 'random-id'
+Failure(source='user.retrieve', error=KeyError('random-id'), details={'id': 'random-id'})
+
 ````

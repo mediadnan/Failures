@@ -48,6 +48,7 @@ docs/_build/
 env/
 venv/
 *-venv/
+.venv/
 
 # MyPy
 .mypy_cache/

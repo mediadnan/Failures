@@ -1,10 +1,9 @@
-"""Failures package provides tools to label and track errors anywhere in your code easily"""
-from ._print import print_failure
-from .core import handler_ as handler, scope, scoped, FailureHandler, Failure
-from ._legacy import handle, SubScope   # deprecated API
+"""This library provides tools to label and handle errors anywhere in your code easily"""
+from .core import Reporter, Failure, FailureException
+from .functions import scoped
+from .handler import Handler, print_failure, Not
 
-
-# -------------------------------- WARNING --------------------------------- #
+# -------------------------------- WARNING! -------------------------------- #
 #                                                                            #
 #       Anything that starts with an _ or not explicitly imported here       #
 #       or mentioned anywhere in the documentation is considered             #
@@ -17,5 +16,4 @@ from ._legacy import handle, SubScope   # deprecated API
 #                                                                            #
 # -------------------------------------------------------------------------- #
 
-
-__version__ = '0.2.0'
+__version__ = '1.0.0'

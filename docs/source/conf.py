@@ -14,6 +14,7 @@ release = '0.2'
 # General
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
     "myst_parser"
 ]
 templates_path = ['_templates']
@@ -23,13 +24,17 @@ exclude_patterns = []
 # Autodoc
 # autodoc_mock_imports = ["typing_extensions"]
 
+# MyST Parser
+myst_enable_extensions = ["attrs_block", "attrs_inline"]
+
 # Theme
 html_theme = 'furo'
 html_favicon = "../_static/icon.ico"
 html_logo = "../_static/logo.png"
 html_title = f"{project} {release} docs"
 html_short_title = f"{project} docs"
-html_static_path = ['_static']
+html_static_path = ['../_static']
+html_css_files = ['custom.css']
 html_theme_options = {
     "sidebar_hide_name": True,
     "navigation_with_keys": True,
@@ -57,3 +62,10 @@ html_theme_options = {
         "color-brand-content": "#aa3a50",
     },
 }
+
+# AutoDoc configuration
+autodoc_member_order = 'bysource'
+autoclass_content = "both"
+
+# ViewCode configuration
+

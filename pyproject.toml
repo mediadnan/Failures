@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "failures"
 dynamic = ["version", "dependencies"]
-description = "Labeling failures for humans"
+description = "Successfully dealing with failures"
 readme = "README.md"
 license = {text = "MIT License"}
 requires-python = ">=3.8"
@@ -39,11 +39,13 @@ version = {attr = "failures.__version__"}
 dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
-colors = ["colorama>=0.4,<1.0"]
+colors = ["colorama>=0.4,<1.0", "types-colorama"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 filterwarnings = ['ignore:.*will be removed in failures \d.0.*:DeprecationWarning',]
+addopts = "--cov=failures --cov-report=html --cov-branch"
+testpaths = "tests/"
 
 [tool.mypy]
 implicit_optional = true
