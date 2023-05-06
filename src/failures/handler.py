@@ -1,6 +1,6 @@
 import re
 import abc
-from typing import Pattern, List, Literal, Callable, Type, Tuple, Union
+from typing import Pattern, List, Literal, Callable, Type, Tuple, Union, cast
 from datetime import datetime
 
 try:
@@ -104,7 +104,7 @@ def filters(spec: Filters, /) ->FailureFilter:
     """
     if isinstance(spec, FailureMatch) or spec is _match_all:
         # for prepared filters
-        return spec
+        return cast(Union[FailureMatch, FailureFilter], spec)
     if isinstance(spec, (tuple, list)):
         if not spec:
             raise _invalid(TypeError, f"Cannot use an empty {type(spec).__name__} as failure specification")
@@ -173,7 +173,7 @@ def combine(handlers: Union[FailureHandler, Tuple[FailureHandler, ...]], /) -> F
             raise _invalid(TypeError, "Cannot define an empty tuple as failure handler")
         if len(handlers) > 1:
             def handle(failure: Failure) -> None:
-                for handler in handlers:
+                for handler in handlers:  # type: ignore[union-attr]
                     handler(failure)
             handlers = tuple(map(_validate_handler, handlers))
             return handle

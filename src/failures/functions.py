@@ -142,7 +142,7 @@ def scoped(arg=None, /):
         name_ = name or get_func_name(func_)
 
         def get_reporter(args, kwargs) -> Reporter:
-            reporter = _get(args, kwargs)
+            reporter: Optional[Callable[[str], Reporter]] = _get(args, kwargs)
             if reporter is None:
                 reporter = Reporter
             elif not isinstance(reporter, Reporter):
