@@ -9,6 +9,7 @@ on:
       - src/**
       - tests/**
       - requirements.txt
+      - requirements_dev.txt
   pull_request:
     branches:
       - main
@@ -35,7 +36,7 @@ jobs:
           pip install -e .
           pip install tox tox-gh-actions
       - name : Running Tox ▶️
-        run: pytest --cov=src/failures/ --cov-branch tests/
+        run: tox -v -p
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3
         with:
