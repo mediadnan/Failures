@@ -78,7 +78,9 @@ class FailureExceptionMatch(FailureMatch):
 
     def __call__(self, failure: Failure, /) -> bool:
         """Checks if the failure's error matches the specification"""
-        return isinstance(failure.error, self.exc_type)
+        err = failure.error
+        exp = self.exc_type
+        return isinstance(err, exp) or (isinstance(err, type) and issubclass(err, exp))
 
 
 def _match_all(_: Failure, /) -> Literal[True]:
@@ -111,8 +113,15 @@ def filters(spec: Filters, /) ->FailureFilter:
         _filters = list(map(filters, spec))
         if len(_filters) == 1:
             return _filters[0]
-        comb = any if isinstance(spec, list) else all
-        def check(failure: Failure) -> bool: return comb((_filter(failure) for _filter in _filters))
+        if isinstance(spec, list):
+            if _match_all in _filters:
+                return _match_all
+            comb = any
+        else:
+            comb = all
+
+        def check(failure: Failure) -> bool:
+            return comb((_filter(failure) for _filter in _filters))
         return check
     if spec == '*' or spec is Exception:
         return _match_all  # optimising match
@@ -143,6 +152,8 @@ class Not(FailureMatch):
             if len(spec) == 1 else
             list(spec)
         )
+        if self._filter is _match_all:
+            raise ValueError("Cannot filter out all failures")
 
     def __call__(self, failure: Failure, /) -> bool:
         return not self._filter(failure)
