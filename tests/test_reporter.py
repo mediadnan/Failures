@@ -7,6 +7,12 @@ from failures import Reporter, Failure, FailureException
 from failures.core import _invalid, ReporterChild
 
 
+# Note:
+#   Some test functions use explicit if not (...): raise AssertionError instead of assert statements,
+#   the reason is to make those tests run in both normal and optimized modes, as running python3 -O
+#   disables assert statements.
+
+
 @mark.parametrize("name", [
     "root", "root.sub", "root.sub_scope",
     "root.sub.sub.sub", "root.scope1",
@@ -16,12 +22,16 @@ from failures.core import _invalid, ReporterChild
 def test_reporter_valid_names(name: str):
     # Valid for first reporter
     reporter = Reporter(name)
-    assert reporter.name == name
-    assert reporter.label == name
+    if reporter.name != name:
+        raise AssertionError(f"Unexpected name {__debug__=}")
+    if reporter.label != name:
+        raise AssertionError(f"Unexpected label {__debug__=}")
     # Valid for sub reporter
     reporter = reporter(name)
-    assert reporter.name == name
-    assert reporter.label == f"{name}.{name}"
+    if reporter.name != name:
+        raise AssertionError(f"Unexpected name {__debug__=}")
+    if reporter.label != f"{name}.{name}":
+        raise AssertionError(f"Unexpected label {__debug__=}")
 
 
 @mark.parametrize("name, catch_failure", [
