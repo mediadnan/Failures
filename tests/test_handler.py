@@ -1,4 +1,6 @@
 from contextlib import nullcontext as is_ok
+from typing import Tuple, List
+
 from pytest import mark, raises, param
 from failures import Handler, print_failure, Failure, Not
 
@@ -32,12 +34,12 @@ TE = TypeError("Test")
 KE = KeyError("Test")
 IE = IndexError("Test")
 FAILURES = [
-    Failure("source1.action1.sub", VE, {}),
-    Failure("source1.action1", TE, {}),
-    Failure("source1.action2.sub", VE, {}),
-    Failure("source2.action2", TE, {}),
-    Failure("source2.action1.sub", KE, {}),
-    Failure("source2.action2.sub", IE, {}),
+    Failure("source1.action1.sub", VE, {}),  # 0
+    Failure("source1.action1", TE, {}),      # 1
+    Failure("source1.action2.sub", VE, {}),  # 2
+    Failure("source2.action2", TE, {}),      # 3
+    Failure("source2.action1.sub", KE, {}),  # 4
+    Failure("source2.action2.sub", IE, {}),  # 5
 ]
 
 
@@ -60,3 +62,31 @@ def test_filter_combination(flt, fls):
     for failure in FAILURES:
         handler(failure)
     assert ls == [FAILURES[fl] for fl in fls]
+
+
+class Hd:
+    def __init__(self) -> None: self.ls = []
+    def __call__(self, failure: Failure, /) -> None: self.ls.append(failure)
+
+
+@mark.parametrize("args, fls", [
+    param("(h[0], h[1])", [(0, 1, 2, 3, 4, 5,), (0, 1, 2, 3, 4, 5,)], id="two-handlers"),
+    param("(h[0], h[1], h[2])", [(0, 1, 2, 3, 4, 5,), (0, 1, 2, 3, 4, 5,), (0, 1, 2, 3, 4, 5,)], id="three-handlers"),
+    param("((h[0], ValueError), (h[1], KeyError))", [(0, 2,), (4,)], id="two-filtered-handlers"),
+    param("(((h[0], h[1]), (TypeError, 'source2.*')), (h[2], LookupError))", [(3,), (3,), (4, 5)], id="combined-handlers"),
+])
+def test_handler_combination(args: str, fls: List[Tuple[int, ...]]):
+    h = [Hd() for _ in range(len(fls))]
+    handler = Handler(*eval(args))
+    for failure in FAILURES:
+        handler(failure)
+    for _handler, _failures in zip(h, fls):
+        assert _handler.ls == [FAILURES[_f] for _f in _failures]
+
+
+def test_handler_context():
+    raise NotImplementedError
+
+
+def test_handle_from_reporter():
+    raise NotImplementedError
