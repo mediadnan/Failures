@@ -36,7 +36,7 @@ jobs:
           pip install -e .
           pip install tox tox-gh-actions
       - name : Running Tox ▶️
-        run: tox -v -p
+        run: tox -v
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3
         with:
