@@ -21,20 +21,20 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
-        python-version: [ '3.8', '3.11' ]
+        python-version: [ '3.8', '3.9', '3.10', '3.11' ]
 
     steps:
       - uses: actions/checkout@v3
       - name: Setting up Python ${{ matrix.python-version }} 🐍
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
-          pip install .
-          pip install pytest pytest-cov
-      - name : Running PyTest ▶️
+          pip install -e .
+          pip install tox tox-gh-actions
+      - name : Running Tox ▶️
         run: pytest --cov=src/failures/ --cov-branch tests/
       - name: Upload test coverage to Codecov ☂️
         uses: codecov/codecov-action@v3

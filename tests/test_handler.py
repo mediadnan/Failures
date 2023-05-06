@@ -1,8 +1,8 @@
 from contextlib import nullcontext as is_ok
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Type
 
 from pytest import mark, raises, param
-from failures import Handler, print_failure, Failure, Not
+from failures import Handler, print_failure, Failure, Not, Reporter
 
 
 @mark.parametrize("args, expectation", [
@@ -19,6 +19,8 @@ from failures import Handler, print_failure, Failure, Not
     ("((print, Not(ValueError, '*')),)", raises(ValueError, match="Cannot filter out all failures")),
     ("(((), (ValueError,)),)", raises(TypeError, match="Cannot define an empty tuple as failure handler")),
     ("(((print,), (ValueError,)),)", is_ok()),
+    ("((print,),)", raises(ValueError, match="The tuple of filtered handler must contain exactly two elements")),
+    ("((print, Exception, 'a*'),)", raises(ValueError, match="The tuple of filtered handler must contain exactly two elements")),
 ])
 def test_handler_arg_validation(args, expectation):
     with expectation:
@@ -67,6 +69,7 @@ def test_filter_combination(flt, fls):
 class Hd:
     def __init__(self) -> None: self.ls = []
     def __call__(self, failure: Failure, /) -> None: self.ls.append(failure)
+    def __bool__(self): return bool(self.ls)
 
 
 @mark.parametrize("args, fls", [
@@ -84,9 +87,32 @@ def test_handler_combination(args: str, fls: List[Tuple[int, ...]]):
         assert _handler.ls == [FAILURES[_f] for _f in _failures]
 
 
-def test_handler_context():
-    raise NotImplementedError
+@mark.parametrize("err", [Exception('...'), None], ids=repr)
+@mark.parametrize("rep", [Reporter("lb"), Reporter("lb", a=1)("sb", b=2)], ids=repr)
+def test_handler_context(rep: Reporter, err: Optional[Exception]):
+    hd = Hd()
+    with Handler(hd):
+        with rep:
+            if err:
+                raise err
+    assert hd.ls == ([Failure(rep.label, err, rep.details)] if err else [])
 
 
 def test_handle_from_reporter():
-    raise NotImplementedError
+    hd = Hd()
+    handler = Handler(hd)
+    reporter = Reporter("test")
+    for _ in range(4):
+        reporter.report(Exception("..."))
+    handler.from_reporter(reporter)
+    assert hd and (hd.ls == reporter.failures)
+
+
+@mark.parametrize("err", [KeyboardInterrupt, Exception, ValueError, OSError, GeneratorExit])
+def test_only_handles_failure_exceptions(err: Type[Exception]):
+    hd = Hd()
+    with raises(err):
+        with Handler(hd):
+            raise err("...")
+    assert not hd
+
