@@ -15,6 +15,8 @@ from failures import Handler, print_failure, Failure, Not
     ("((print, Not('*')),)", raises(ValueError, match="Cannot filter out all failures")),
     ("((print, Not(Exception)),)", raises(ValueError, match="Cannot filter out all failures")),
     ("((print, Not(ValueError, '*')),)", raises(ValueError, match="Cannot filter out all failures")),
+    ("(((), (ValueError,)),)", raises(TypeError, match="Cannot define an empty tuple as failure handler")),
+    ("(((print,), (ValueError,)),)", is_ok()),
 ])
 def test_handler_arg_validation(args, expectation):
     with expectation:

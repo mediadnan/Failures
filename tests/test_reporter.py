@@ -34,6 +34,7 @@ def test_reporter_valid_names(name: str):
         raise AssertionError(f"Unexpected label {__debug__=}")
 
 
+@mark.skipif(__debug__ is False, reason="No validation is done with optimized mode")
 @mark.parametrize("name, catch_failure", [
     param(object(), raises(TypeError), id="wrong_name_type"),
     param(b'name.sub', raises(TypeError), id="wrong_type_name_bytes"),
@@ -51,6 +52,7 @@ def test_reporter_invalid_names(name: str, catch_failure):
         Reporter("rep")(name)
 
 
+@mark.skipif(__debug__ is False, reason="No validation is done with optimized mode")
 def test_direct_reporter_child_creation():
     with raises(TypeError):
         ReporterChild("rep", None)  # type: ignore
