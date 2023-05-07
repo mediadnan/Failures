@@ -12,7 +12,10 @@ project = 'Failures'
 project_copyright = '2023, MARSO Adnan'
 author = 'MARSO Adnan'
 version = failures.__version__
-release = re.match(r'(\d+.\d+).*', version).group(1)
+try:
+    release = re.match(r'(\d+.\d+).*', version).group(1)
+except (TypeError, AttributeError, ValueError):
+    release = version
 
 # General
 extensions = [
@@ -34,7 +37,7 @@ myst_enable_extensions = ["attrs_block", "attrs_inline"]
 html_theme = 'furo'
 html_favicon = "../_static/icon.ico"
 html_logo = "../_static/logo.png"
-html_title = f"{project} {release} docs"
+html_title = f"{project} documentation"
 html_short_title = f"{project} docs"
 html_static_path = ['../_static']
 html_css_files = ['custom.css']
