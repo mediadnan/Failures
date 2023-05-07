@@ -3,8 +3,13 @@ name: release
 on:
   release:
     types: [published]
+  workflow_call:
 
 jobs:
+  test:
+    name: Running Tests 🧪
+    uses: ./.github/workflows/tests.yml
+
   upload:
     name: Publishing to PyPI ⬆️
     runs-on: ubuntu-latest

@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - .github/**
-      - src/**
+      - .github/workflows/test.yml
+      - src/failures/**
       - tests/**
       - requirements.txt
       - requirements_dev.txt
