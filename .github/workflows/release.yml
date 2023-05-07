@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     name: Running Tests 🧪
-    uses: ./.github/workflows/tests.yml
+    uses: ./.github/workflows/test.yml
 
   upload:
     name: Publishing to PyPI ⬆️
