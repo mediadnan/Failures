@@ -1,5 +1,7 @@
+import re
 import sys
 import pathlib
+import failures
 
 
 sys.path.insert(0, (pathlib.Path(__file__).parents[2]/'src').resolve().as_posix())  # Needed for 'sphinx.ext.autodoc'
@@ -9,7 +11,8 @@ sys.path.insert(0, (pathlib.Path(__file__).parents[2]/'src').resolve().as_posix(
 project = 'Failures'
 project_copyright = '2023, MARSO Adnan'
 author = 'MARSO Adnan'
-release = '0.2'
+version = failures.__version__
+release = re.match(r'(\d+.\d+).*', version).group(1)
 
 # General
 extensions = [
