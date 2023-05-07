@@ -10,6 +10,7 @@ on:
       - tests/**
       - requirements.txt
       - requirements_dev.txt
+      - pyproject.toml
   pull_request:
     branches:
       - main

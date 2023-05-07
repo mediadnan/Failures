@@ -8,16 +8,13 @@ jobs:
   test:
     name: Running tests 🧪
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        py: [ '3.8', '3.11' ]
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setting up Python ${{ matrix.py }} 🐍
+      - name: Setting up Python 3.11 🐍
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.py }}
+          python-version: '3.11'
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip

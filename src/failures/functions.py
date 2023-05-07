@@ -1,3 +1,7 @@
+"""
+functions.py module implements functions decorators and utilities to reduce and automate common tasks needed
+by this library like labeling the top level scope of functions.
+"""
 from __future__ import annotations
 import types
 import inspect

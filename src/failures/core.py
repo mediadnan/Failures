@@ -1,3 +1,8 @@
+"""
+core.py module contains the base library elements, the main ones are ``Reporter`` and ``Failure``;
+the first is used to collect failures between a series of operations, and the second is a wrapper
+that encapsulates failure details.
+"""
 import re
 from functools import cached_property
 from typing import Optional, Type, List, Dict, Any, Callable, Awaitable, NamedTuple, TypeVar
@@ -108,7 +113,7 @@ class Reporter:
         self.__name = name
         self._details = details
 
-    def __call__(self, name: str, /, **details) -> 'ReporterChild':
+    def __call__(self, name: str, /, **details) -> '_ReporterChild':
         """
         Creates a reporter child bound to the current one.
 
@@ -116,7 +121,7 @@ class Reporter:
         :param details: Additional details bound to the reporter
         :returns: New reporter object
         """
-        return ReporterChild(name, self, **details)
+        return _ReporterChild(name, self, **details)
 
     def __repr__(self) -> str:
         return f'Reporter({self.label!r})'
@@ -254,7 +259,7 @@ class Reporter:
             return await func(*args, **kwargs)
 
 
-class ReporterChild(Reporter):
+class _ReporterChild(Reporter):
     __slots__ = ('__parent',)
     __parent: Reporter
 

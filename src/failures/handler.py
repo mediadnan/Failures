@@ -1,3 +1,8 @@
+"""
+handler.py module implements tools for handling and processing failures gathered or raised
+by reporters, and tools to filter between failures either by label or by error type and combine
+multiple failure handling functions.
+"""
 import re
 import abc
 from typing import Pattern, List, Literal, Callable, Type, Tuple, Union, cast

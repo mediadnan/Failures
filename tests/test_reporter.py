@@ -4,7 +4,7 @@ from typing import Union, Optional, Tuple, List
 from pytest import param, raises, mark
 
 from failures import Reporter, Failure, FailureException
-from failures.core import _invalid, ReporterChild
+from failures.core import _invalid, _ReporterChild
 
 
 # Note:
@@ -55,7 +55,7 @@ def test_reporter_invalid_names(name: str, catch_failure):
 @mark.skipif(__debug__ is False, reason="No validation is done with optimized mode")
 def test_direct_reporter_child_creation():
     with raises(TypeError):
-        ReporterChild("rep", None)  # type: ignore
+        _ReporterChild("rep", None)  # type: ignore
 
 
 @mark.parametrize("details", [{}, {'input': 27, 'desc': "cubic root evaluation"}], ids=str)
