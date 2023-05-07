@@ -5,14 +5,12 @@ on:
     types: [published]
 
 needs:
-  - tests
-
+  - test
 
 jobs:
   upload:
     name: Publishing to PyPI ⬆️
     runs-on: ubuntu-latest
-    needs: test
 
     steps:
       - uses: actions/checkout@v3
