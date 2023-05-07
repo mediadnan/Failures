@@ -12,16 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setting up Python 3.11 🐍
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
       - name: Installing dependencies 📥
         run: |
           python3 -m pip install --upgrade pip
-          pip install .
           pip install pytest
       - name: Testing with pytest 🧪
-        run: pytest tests/
+        run: pytest
 
   upload:
     name: Publishing to PyPI ⬆️
