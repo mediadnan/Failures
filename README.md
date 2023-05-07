@@ -2,7 +2,7 @@
 <h1 style="color: #913946ff; font-family: Candara, sans-serif;">Failures</h1>
 <p style="color: #bf6572; font-family: Candara, sans-serif; font-style: italic">Successfully dealing with failures</p>
 <br/>
-<a href="https://github.com/mediadnan/Failures/actions/workflows/tests.yml" target="_blank"><img src="https://github.com/mediadnan/Failures/actions/workflows/tests.yml/badge.svg" alt="Tests"/></a>
+<a href="https://github.com/mediadnan/Failures/actions/workflows/test.yml" target="_blank"><img src="https://github.com/mediadnan/Failures/actions/workflows/test.yml/badge.svg" alt="Tests"/></a>
 <a href="https://codecov.io/gh/mediadnan/Failures" target="_blank"><img src="https://codecov.io/gh/mediadnan/Failures/branch/main/graph/badge.svg?token=E58PJ3OFME" alt="CodeCov"/></a>
 <a href="https://www.python.org/downloads/" target="_blank"><img src="https://img.shields.io/pypi/pyversions/failures" alt="PyPI - Python Version"/></a>
 <a href="https://failures.readthedocs.io/" target="_blank"><img alt="Read the Docs" src="https://img.shields.io/readthedocs/failures"></a>
