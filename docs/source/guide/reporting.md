@@ -142,13 +142,13 @@ the following example:
 >>> # Comparing names (labels without parents)
 >>> user_rep.name
 'user'
->>> user_download.label
+>>> user_download.name
 'download'
->>> user_parse.label
+>>> user_parse.name
 'parse'
->>> parse_email.label
+>>> parse_email.name
 'email'
->>> parse_phone.label
+>>> parse_phone.name
 'phone'
 >>>
 >>> # Comparing details
