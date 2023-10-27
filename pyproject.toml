@@ -7,11 +7,11 @@ name = "failures"
 dynamic = ["version", "dependencies"]
 description = "Successfully dealing with failures"
 readme = "README.md"
-license = {text = "MIT License"}
+license = { text = "MIT License" }
 requires-python = ">=3.8"
-authors = [ {name = "MARSO Adnan", email = "mediadnan@gmail.com"} ]
-maintainers = [ {name = "MARSO Adnan", email = "mediadnan@gmail.com"} ]
-keywords = [ "label", "failures", "handle", "handling", "report", "track" ]
+authors = [{ name = "MARSO Adnan", email = "mediadnan@gmail.com" }]
+maintainers = [{ name = "MARSO Adnan", email = "mediadnan@gmail.com" }]
+keywords = ["label", "failures", "handle", "handling", "report", "track"]
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Development Status :: 5 - Production/Stable",
@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Topic :: Utilities",
-    "Typing :: Typed"
+    "Typing :: Typed",
 ]
 
 [project.urls]
@@ -31,19 +31,25 @@ documentation = "https://failures.readthedocs.org"
 repository = "https://github.com/mediadnan/failures"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+include-package-data = true
+package-dir = { "" = "src" }
 packages = ["failures"]
 
+[tool.setuptools.package-data]
+"failures" = ["py.typed"]
+
 [tool.setuptools.dynamic]
-version = {attr = "failures.__version__"}
-dependencies = {file = "requirements.txt"}
+version = { attr = "failures.__version__" }
+dependencies = { file = "requirements.txt" }
 
 [project.optional-dependencies]
 colors = ["colorama>=0.4,<1.0", "types-colorama"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-filterwarnings = ['ignore:.*will be removed in failures \d.0.*:DeprecationWarning',]
+filterwarnings = [
+    'ignore:.*will be removed in failures \d.0.*:DeprecationWarning',
+]
 addopts = "--cov=failures --cov-report=html --cov-branch"
 testpaths = "tests/"
 

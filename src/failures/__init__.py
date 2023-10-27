@@ -16,4 +16,4 @@ from .handler import Handler, print_failure, Not
 #                                                                            #
 # -------------------------------------------------------------------------- #
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
