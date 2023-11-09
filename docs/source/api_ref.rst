@@ -8,6 +8,8 @@ to switch between source code and documentation.
 .. autoclass:: failures.Failure
     :members:
 
+.. autoclass:: failures.FailureException
+
 .. autoclass:: failures.Reporter
     :members:
     :special-members: __call__
